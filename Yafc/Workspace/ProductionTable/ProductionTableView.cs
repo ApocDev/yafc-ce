@@ -889,6 +889,21 @@ goodsHaveNoProduction:;
     private void OpenProductDropdown(ImGui targetGui, Rect rect, IObjectWithQuality<Goods> goods, float amount, IProductionLink? iLink,
         ProductDropdownType type, RecipeRow? recipe, ProductionTable context, Goods[]? variants = null) {
 
+        if (InputSystem.Instance.control && InputSystem.Instance.shift) {
+            var bestRecipe = goods.target.production
+                .Where(r => r.IsAccessible() && r.IsAutomatableWithCurrentMilestones())
+                .OrderBy(r => r.name.Contains("barrel", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(r => CostAnalysis.InstanceAtMilestones.recipeWastePercentage[r])
+                .ThenBy(r => r.Cost(true))
+                .FirstOrDefault();
+
+            if (bestRecipe != null) {
+                RebuildIf(context.CreateLink(goods));
+                context.AddRecipe(bestRecipe.With(goods.quality), DefaultVariantOrdering);
+            }
+            return;
+        }
+
         if (InputSystem.Instance.shift) {
             Project.current.preferences.SetSourceResource(goods.target, !goods.IsSourceResource());
             targetGui.Rebuild();

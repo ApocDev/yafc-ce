@@ -439,6 +439,9 @@ public class Item : Goods {
         if (this == Database.science.target) {
             return (Database.technologies.all, DependencyNode.Flags.Source);
         }
+        // if (spoilResult is not null) {
+        //     return (production.Concat(miscSources).Append(spoilResult), DependencyNode.Flags.Source);
+        // }
         return base.GetDependencies();
     }
 }
