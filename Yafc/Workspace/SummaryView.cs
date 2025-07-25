@@ -271,6 +271,36 @@ public class SummaryView : ProjectPageView<Summary> {
                 }
             }
         }
+
+        // Missing items section
+        if (model?.showMissingItems == true && model.missingItems != null && model.missingItems.Count > 0) {
+            gui.AllocateSpacing();
+            using (gui.EnterRow()) {
+                gui.BuildText("Missing Items", Font.subheader);
+
+                if (gui.BuildButton("Create sheet from missing items")) {
+                    await CreateSheetFromMissingItems();
+                }
+            }
+
+            using (gui.EnterGroup(new Padding(1f))) {
+                using var grid = gui.EnterInlineGrid(ElementWidth, ElementSpacing);
+                foreach (var (goodsName, deficit) in model.missingItems) {
+                    // Find the goods object from the name to display it
+                    var goods = FindGoodsByName(goodsName);
+                    if (goods != null) {
+                        grid.Next();
+                        var evt = gui.BuildFactorioObjectWithAmount(goods, new(deficit, goods.target.flowUnitOfMeasure),
+                            ButtonDisplayStyle.ProductionTableScaled(SchemeColor.Error));
+
+                        if (evt == Click.Left) {
+                            await CreateSheetForSingleItem(goods, deficit);
+                        }
+                    }
+                }
+            }
+        }
+
         gui.AllocateSpacing();
 
         if (gui.isBuilding) {
@@ -408,6 +438,15 @@ public class SummaryView : ProjectPageView<Summary> {
 
         allGoods = newGoods;
 
+        // Update missing items in the model
+        if (model != null) {
+            var goodsForMissing = newGoods.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (kvp.Value.totalProvided, kvp.Value.totalNeeded, kvp.Value.extraProduced, kvp.Value.sum)
+            );
+            model.UpdateMissingItems(goodsForMissing);
+        }
+
         Rebuild(visualOnly);
         scrollArea.RebuildContents();
     }
@@ -416,6 +455,100 @@ public class SummaryView : ProjectPageView<Summary> {
     private static float YafcRounding(float value) {
         _ = DataUtils.TryParseAmount(DataUtils.FormatAmount(value, UnitOfMeasure.PerSecond), out float result, UnitOfMeasure.PerSecond);
         return result;
+    }
+
+    private IObjectWithQuality<Goods>? FindGoodsByName(string goodsName) {
+        // Look through all production tables to find a goods object with this name
+        foreach (Guid displayPage in project.displayPages) {
+            ProjectPage? page = project.FindPage(displayPage);
+            ProductionTable? content = page?.content as ProductionTable;
+
+            if (content == null) {
+                continue;
+            }
+
+            foreach (IProductionLink link in content.allLinks) {
+                if (link.goods.QualityName() == goodsName) {
+                    return link.goods;
+                }
+            }
+
+            foreach (ProductionTableFlow flow in content.flow) {
+                if (flow.goods.QualityName() == goodsName) {
+                    return flow.goods;
+                }
+            }
+        }
+        return null;
+    }
+
+    private async Task CreateSheetFromMissingItems() {
+        if (model?.missingItems == null || model.missingItems.Count == 0 || project == null) {
+            return;
+        }
+
+        try {
+            // Create a new production table page
+            var newPage = new ProjectPage(project, typeof(ProductionTable)) {
+                name = "Missing Items Production"
+            };
+            project.RecordUndo().pages.Add(newPage);
+            var productionTable = (ProductionTable)newPage.content;
+
+            // Add each missing item as a desired product
+            foreach (var (goodsName, deficit) in model.missingItems) {
+                var goods = FindGoodsByName(goodsName);
+                if (goods != null) {
+                    var link = new ProductionLink(productionTable, goods) {
+                        amount = deficit
+                    };
+                    productionTable.RecordUndo().links.Add(link);
+                }
+            }
+
+            // Solve the new page
+            await newPage.RunSolveJob();
+
+            // Navigate to the new page
+            MainScreen.Instance?.SetActivePage(newPage);
+        }
+        catch (Exception ex) {
+            // Log the error or handle it appropriately
+            Console.WriteLine($"Error creating sheet from missing items: {ex.Message}");
+        }
+    }
+
+    private async Task CreateSheetForSingleItem(IObjectWithQuality<Goods> goods, float deficit) {
+        if (goods == null || project == null) {
+            return;
+        }
+
+        try {
+            // Create a new production table page with the item name
+            var itemName = goods.target.locName ?? goods.target.name;
+            var newPage = new ProjectPage(project, typeof(ProductionTable)) {
+                name = $"Production: {itemName}",
+                icon = goods.target
+            };
+            project.RecordUndo().pages.Add(newPage);
+            var productionTable = (ProductionTable)newPage.content;
+
+            // Add the single item as a desired product
+            var link = new ProductionLink(productionTable, goods) {
+                amount = deficit
+            };
+            productionTable.RecordUndo().links.Add(link);
+
+            // Solve the new page
+            await newPage.RunSolveJob();
+
+            // Navigate to the new page
+            MainScreen.Instance?.SetActivePage(newPage);
+        }
+        catch (Exception ex) {
+            // Log the error or handle it appropriately
+            Console.WriteLine($"Error creating sheet for single item: {ex.Message}");
+        }
     }
 
     public override void SetSearchQuery(SearchQuery query) {

@@ -52,14 +52,20 @@ public class ProductionTableView : ProjectPageView<ProductionTable> {
                 ButtonEvent evt;
 
                 if (isError) {
-                    evt = gui.BuildRedButton(Icon.Error, invertedColors: true);
+                    // Add a semi-transparent background with border for better contrast with icons
+                    using (gui.EnterGroup(ImGuiUtils.DefaultIconPadding)) {
+                        gui.DrawRectangle(gui.lastRect, SchemeColor.PureBackground, RectangleBorder.Thin, drawTransparent: true);
+                        gui.BuildIcon(Icon.Error, color: SchemeColor.Error);
+                    }
+                    evt = gui.BuildButton(gui.lastRect, SchemeColor.None, SchemeColor.Error);
                 }
                 else {
+                    // Add a semi-transparent background with border for warning indicators
                     using (gui.EnterGroup(ImGuiUtils.DefaultIconPadding)) {
-                        gui.BuildIcon(Icon.Help);
+                        gui.DrawRectangle(gui.lastRect, SchemeColor.PureBackground, RectangleBorder.Thin, drawTransparent: true);
+                        gui.BuildIcon(Icon.Help, color: SchemeColor.Secondary);
                     }
-
-                    evt = gui.BuildButton(gui.lastRect, SchemeColor.None, SchemeColor.Grey);
+                    evt = gui.BuildButton(gui.lastRect, SchemeColor.None, SchemeColor.Secondary);
                 }
 
                 if (evt == ButtonEvent.MouseOver) {
@@ -378,7 +384,7 @@ goodsHaveNoProduction:;
             gui.AllocateSpacing(0.5f);
             if (recipe.fuel != Database.voidEnergy || recipe.entity == null || recipe.entity.target.energy.type != EntityEnergyType.Void) {
                 var (fuel, fuelAmount, fuelLink, _) = recipe.FuelInformation;
-                view.BuildGoodsIcon(gui, fuel, fuelLink, fuelAmount, ProductDropdownType.Fuel, recipe, recipe.linkRoot, HintLocations.OnProducingRecipes);
+                view.BuildGoodsIcon(gui, fuel, fuelLink, (float)fuelAmount, ProductDropdownType.Fuel, recipe, recipe.linkRoot, HintLocations.OnProducingRecipes);
             }
             else {
                 if (recipe.recipe == Database.electricityGeneration && recipe.entity.target.factorioType is "solar-panel" or "lightning-attractor") {
@@ -649,11 +655,11 @@ goodsHaveNoProduction:;
             else {
                 foreach (var (goods, amount, link, variants) in recipe.Ingredients) {
                     grid.Next();
-                    view.BuildGoodsIcon(gui, goods, link, amount, ProductDropdownType.Ingredient, recipe, recipe.linkRoot, HintLocations.OnProducingRecipes, variants);
+                    view.BuildGoodsIcon(gui, goods, link, (float)amount, ProductDropdownType.Ingredient, recipe, recipe.linkRoot, HintLocations.OnProducingRecipes, variants);
                 }
                 if (recipe.fixedIngredient == Database.itemInput || recipe.showTotalIO) {
                     grid.Next();
-                    view.BuildGoodsIcon(gui, recipe.hierarchyEnabled ? Database.itemInput : null, null, recipe.Ingredients.Where(i => i.Goods?.target is Item).Sum(i => i.Amount),
+                    view.BuildGoodsIcon(gui, recipe.hierarchyEnabled ? Database.itemInput : null, null, (float)recipe.Ingredients.Where(i => i.Goods?.target is Item).Sum(i => i.Amount),
                         ProductDropdownType.Ingredient, recipe, recipe.linkRoot, HintLocations.None);
                 }
             }
@@ -671,20 +677,20 @@ goodsHaveNoProduction:;
                 foreach (var (goods, amount, link, percentSpoiled) in recipe.Products) {
                     grid.Next();
                     if (recipe.recipe.target is Recipe { preserveProducts: true }) {
-                        view.BuildGoodsIcon(gui, goods, link, amount, ProductDropdownType.Product, recipe, recipe.linkRoot, new() {
+                        view.BuildGoodsIcon(gui, goods, link, (float)amount, ProductDropdownType.Product, recipe, recipe.linkRoot, new() {
                             HintLocations = HintLocations.OnConsumingRecipes,
                             ExtraSpoilInformation = gui => gui.BuildText(LSs.ProductionTableOutputPreservedInMachine, TextBlockDisplayStyle.WrappedText)
                         });
                     }
                     else if (percentSpoiled == null) {
-                        view.BuildGoodsIcon(gui, goods, link, amount, ProductDropdownType.Product, recipe, recipe.linkRoot, HintLocations.OnConsumingRecipes);
+                        view.BuildGoodsIcon(gui, goods, link, (float)amount, ProductDropdownType.Product, recipe, recipe.linkRoot, HintLocations.OnConsumingRecipes);
                     }
                     else if (percentSpoiled == 0) {
-                        view.BuildGoodsIcon(gui, goods, link, amount, ProductDropdownType.Product, recipe, recipe.linkRoot,
+                        view.BuildGoodsIcon(gui, goods, link, (float)amount, ProductDropdownType.Product, recipe, recipe.linkRoot,
                             new() { HintLocations = HintLocations.OnConsumingRecipes, ExtraSpoilInformation = gui => gui.BuildText(LSs.ProductionTableOutputAlwaysFresh) });
                     }
                     else {
-                        view.BuildGoodsIcon(gui, goods, link, amount, ProductDropdownType.Product, recipe, recipe.linkRoot, new() {
+                        view.BuildGoodsIcon(gui, goods, link, (float)amount, ProductDropdownType.Product, recipe, recipe.linkRoot, new() {
                             HintLocations = HintLocations.OnConsumingRecipes,
                             ExtraSpoilInformation = gui => gui.BuildText(LSs.ProductionTableOutputFixedSpoilage.L(DataUtils.FormatAmount(percentSpoiled.Value, UnitOfMeasure.Percent)))
                         });
@@ -692,7 +698,7 @@ goodsHaveNoProduction:;
                 }
                 if (recipe.fixedProduct == Database.itemOutput || recipe.showTotalIO) {
                     grid.Next();
-                    view.BuildGoodsIcon(gui, recipe.hierarchyEnabled ? Database.itemOutput : null, null, recipe.Products.Where(i => i.Goods?.target is Item).Sum(i => i.Amount),
+                    view.BuildGoodsIcon(gui, recipe.hierarchyEnabled ? Database.itemOutput : null, null, (float)recipe.Products.Where(i => i.Goods?.target is Item).Sum(i => i.Amount),
                         ProductDropdownType.Product, recipe, recipe.linkRoot, HintLocations.None);
                 }
             }
@@ -891,8 +897,11 @@ goodsHaveNoProduction:;
 
         if (InputSystem.Instance.control && InputSystem.Instance.shift) {
             var bestRecipe = goods.target.production
+                // Only currently available recipes are considered.
                 .Where(r => r.IsAccessible() && r.IsAutomatableWithCurrentMilestones())
+                // Barreling recipes should be the last resort, so we sort them to the end. There's too many to weight them by cost.
                 .OrderBy(r => r.name.Contains("barrel", StringComparison.OrdinalIgnoreCase))
+                // Sort by recipe waste percentage, then cost at current milestones.
                 .ThenBy(r => CostAnalysis.InstanceAtMilestones.recipeWastePercentage[r])
                 .ThenBy(r => r.Cost(true))
                 .FirstOrDefault();
@@ -1567,6 +1576,7 @@ goodsHaveNoProduction:;
         {WarningFlags.AssumesFulgoraAndModel, LSs.WarningDescriptionAssumesFulgoranLightning},
         {WarningFlags.UselessQuality, LSs.WarningDescriptionUselessQuality},
         {WarningFlags.ExcessProductivity, LSs.WarningDescriptionExcessProductivityBonus},
+        {WarningFlags.SolverInfeasible, LSs.WarningDescriptionDeadlockCandidate},
     };
 
     private static readonly (Icon icon, SchemeColor color)[] tagIcons = [

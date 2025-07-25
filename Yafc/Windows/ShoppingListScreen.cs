@@ -262,17 +262,17 @@ public class ShoppingListScreen : PseudoScreen {
 
                 foreach (var ingredient in rec.ingredients) {
                     if (ingredient.goods is Fluid) {
-                        addDecomposition(ingredient.goods, Quality.Normal, ingredient.amount * amount);
+                        addDecomposition(ingredient.goods, Quality.Normal, (float)ingredient.amount * amount);
                     }
                     else {
-                        addDecomposition(ingredient.goods, elem.quality, ingredient.amount * amount);
+                        addDecomposition(ingredient.goods, elem.quality, (float)ingredient.amount * amount);
                     }
                 }
             }
             else if (elem.target is Goods g && (g.usages.Length <= 5 || (g is Item item && (item.factorioType != "item" || item.placeResult != null)))
                 && (rec = FindSingleProduction(g.production)!) != null) {
 
-                addDecomposition(g.production[0], elem.quality, amount / rec.GetProductionPerRecipe(g));
+                addDecomposition(g.production[0], elem.quality, amount / (float)rec.GetProductionPerRecipe(g));
             }
             else {
                 continue;

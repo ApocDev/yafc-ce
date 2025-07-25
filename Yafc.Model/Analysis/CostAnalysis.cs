@@ -55,7 +55,7 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
             itemAmountPrefix = LSs.CostAnalysisEstimatedAmountFor.L(project.preferences.targetTechnology.locName);
 
             foreach (var spUsage in TechnologyScienceAnalysis.Instance.allSciencePacks[project.preferences.targetTechnology]) {
-                sciencePackUsage[spUsage.goods] = spUsage.amount;
+                sciencePackUsage[spUsage.goods] = (float)spUsage.amount;
             }
         }
         else {
@@ -70,7 +70,7 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
                             }
 
                             _ = sciencePackUsage.TryGetValue(ingredient.goods, out float prev);
-                            sciencePackUsage[ingredient.goods] = prev + (ingredient.amount * technology.count);
+                            sciencePackUsage[ingredient.goods] = prev + (float)(ingredient.amount * (decimal)technology.count);
                         }
                     }
                 }
@@ -88,7 +88,7 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
                 if (src is Entity ent && ent.mapGenerated) {
                     foreach (var product in ent.loot) {
                         if (product.goods == goods) {
-                            mapGeneratedAmount += product.amount;
+                            mapGeneratedAmount += (float)product.amount;
                         }
                     }
                 }
@@ -190,7 +190,7 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
 
             foreach (var product in recipe.products) {
                 var var = variables[product.goods];
-                float amount = product.amount;
+                float amount = (float)product.amount;
                 constraint.SetCoefficientCheck(var, amount, ref lastVariable[product.goods]);
 
                 if (product.goods is Item) {
@@ -208,13 +208,13 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
 
             foreach (var ingredient in recipe.ingredients) {
                 var var = variables[ingredient.goods]; // TODO split cost analysis
-                constraint.SetCoefficientCheck(var, -ingredient.amount, ref lastVariable[ingredient.goods]);
+                constraint.SetCoefficientCheck(var, -(float)ingredient.amount, ref lastVariable[ingredient.goods]);
 
                 if (ingredient.goods is Item) {
-                    logisticsCost += ingredient.amount * CostPerItem;
+                    logisticsCost += (float)ingredient.amount * CostPerItem;
                 }
                 else if (ingredient.goods is Fluid) {
-                    logisticsCost += ingredient.amount * CostPerFluid;
+                    logisticsCost += (float)ingredient.amount * CostPerFluid;
                 }
             }
 
@@ -222,7 +222,7 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
                 float totalMining = 0f;
 
                 foreach (var product in recipe.products) {
-                    totalMining += product.amount;
+                    totalMining += (float)product.amount;
                 }
 
                 float miningPenalty = MiningPenalty;
@@ -300,7 +300,7 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
                     sumImportance += recipeFlow;
                     flow[recipe] = recipeFlow;
                     foreach (var product in recipe.products) {
-                        flow[product.goods] += recipeFlow * product.amount;
+                        flow[product.goods] += recipeFlow * (float)product.amount;
                     }
                 }
             }
@@ -314,11 +314,11 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
             if (o is RecipeOrTechnology recipe) {
                 foreach (var ingredient in recipe.ingredients) // TODO split
 {
-                    export[o] += export[ingredient.goods] * ingredient.amount;
+                    export[o] += export[ingredient.goods] * (float)ingredient.amount;
                 }
 
                 foreach (var product in recipe.products) {
-                    recipeProductionCost[recipe] += product.amount * export[product.goods];
+                    recipeProductionCost[recipe] += (float)product.amount * export[product.goods];
                 }
             }
             else if (o is Entity entity) {
@@ -345,7 +345,7 @@ public class CostAnalysis(bool onlyCurrentMilestones) : Analysis {
                 float productCost = 0f;
 
                 foreach (var product in recipe.products) {
-                    productCost += product.amount * export[product.goods];
+                    productCost += (float)product.amount * export[product.goods];
                 }
 
                 recipeWastePercentage[recipe] = 1f - (productCost / export[recipe]);

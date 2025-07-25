@@ -534,16 +534,16 @@ internal partial class FactorioDataDeserializer {
                             goto nextWeightCalculation;
                         }
 
-                        weight += i.weight * ingredient.amount;
+                        weight += i.weight * (float)ingredient.amount;
                     }
                     else { // fluid
                         // Barrels gain 5 kg when filled with 50 units of fluid.
                         // This matches data.raw.utility-constants.default_item_weight, so that seems like a good value to use.
-                        weight += defaultItemWeight * ingredient.amount;
+                        weight += defaultItemWeight * (float)ingredient.amount;
                     }
                 }
 
-                item.weight = (int)(weight / recipe.products[0].amount * item.ingredient_to_weight_coefficient);
+                item.weight = (int)(weight / (float)recipe.products[0].amount * item.ingredient_to_weight_coefficient);
 
                 if (!recipe.allowedEffects.HasFlag(AllowedEffects.Productivity)) {
                     // When productivity is disallowed, a rocket can never carry more than one stack.
@@ -641,7 +641,7 @@ nextWeightCalculation:;
             Recipe recipe = CreateSpecialRecipe(pumpingFluid, recipeCategory, LSs.SpecialRecipePumping);
 
             if (recipe.products == null) {
-                recipe.products = [new Product(pumpingFluid, 1200f)]; // set to Factorio default pump amounts - looks nice in tooltip
+                recipe.products = [new Product(pumpingFluid, 1200m)]; // set to Factorio default pump amounts - looks nice in tooltip
                 recipe.ingredients = [];
                 recipe.time = 1f;
             }

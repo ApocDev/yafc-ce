@@ -61,10 +61,10 @@ internal partial class FactorioDataDeserializer {
             foreach (var recipe in allObjects.OfType<Recipe>()) {
                 foreach (var product in recipe.products) {
                     if (product.productivityAmount == product.amount) {
-                        float catalyst = recipe.GetConsumptionPerRecipe(product.goods);
+                        float catalyst = (float)recipe.GetConsumptionPerRecipe(product.goods);
 
                         if (catalyst > 0f) {
-                            product.SetCatalyst(catalyst);
+                            product.SetCatalyst((decimal)catalyst);
                         }
                     }
                 }
@@ -227,10 +227,10 @@ internal partial class FactorioDataDeserializer {
             throw new NotSupportedException($"Could not load one of the products for {typeDotName}, possibly named '{table.Get("name", "")}'.");
         }
 
-        Product product = new Product(goods, min * multiplier, max * multiplier, table.Get("probability", 1f)) { percentSpoiled = percentSpoiled };
+        Product product = new Product(goods, (decimal)(min * multiplier), (decimal)(max * multiplier), (decimal)table.Get("probability", 1f)) { percentSpoiled = percentSpoiled.HasValue ? (decimal?)percentSpoiled.Value : null };
 
         if (catalyst > 0f) {
-            product.SetCatalyst(catalyst);
+            product.SetCatalyst((decimal)catalyst);
         }
 
         return product;
@@ -244,7 +244,7 @@ internal partial class FactorioDataDeserializer {
         }
 
         if (allowSimpleSyntax && table.Get("result", out string? name)) {
-            return [(new Product(GetObject<Item>(name), 1) { percentSpoiled = percentSpoiled })];
+            return [(new Product(GetObject<Item>(name), 1) { percentSpoiled = percentSpoiled.HasValue ? (decimal?)percentSpoiled.Value : null })];
         }
 
         return [];
@@ -270,7 +270,7 @@ internal partial class FactorioDataDeserializer {
                 _ = table.Get("amount", out amount);
             }
 
-            Ingredient ingredient = new Ingredient(goods, amount);
+            Ingredient ingredient = new Ingredient(goods, (decimal)amount);
 
             if (goods is Fluid f) {
                 ingredient.temperature = table.Get("temperature", out int temp)
@@ -308,7 +308,7 @@ internal partial class FactorioDataDeserializer {
                     break;
                 }
                 float craftCount = researchTriggerTable.Get("count", 1);
-                technology.ingredients = [new Ingredient(GetObject<Item>(craftItemName), craftCount)];
+                technology.ingredients = [new Ingredient(GetObject<Item>(craftItemName), (decimal)craftCount)];
                 technology.flags = RecipeFlags.HasResearchTriggerCraft;
 
                 break;

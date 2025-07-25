@@ -138,7 +138,7 @@ public class ModuleCustomizationScreen : PseudoScreenWithResult<ModuleTemplateBu
                 var defaultFiller = recipe?.GetModuleFiller();
                 if (defaultFiller?.GetBeaconsForCrafter(recipe?.entity?.target) is BeaconConfiguration { beacon: not null, beaconModule: not null } beaconsToUse) {
                     EntityBeacon beacon = beaconsToUse.beacon.target;
-                    effects.AddModules(beaconsToUse.beaconModule, beaconsToUse.beacon.GetBeaconEfficiency() * beacon.GetProfile(beaconsToUse.beaconCount) * beacon.moduleSlots * beaconsToUse.beaconCount);
+                    effects.AddModules(beaconsToUse.beaconModule, (decimal)(beaconsToUse.beacon.GetBeaconEfficiency() * beacon.GetProfile(beaconsToUse.beaconCount) * beacon.moduleSlots * beaconsToUse.beaconCount));
                 }
             }
             else {
@@ -152,24 +152,24 @@ public class ModuleCustomizationScreen : PseudoScreenWithResult<ModuleTemplateBu
             }
 
             if (recipe?.entity?.target.effectReceiver.baseEffect is { } baseEffect) {
-                effects.productivity += baseEffect.productivity;
-                effects.speed += baseEffect.speed;
-                effects.consumption += baseEffect.consumption;
+                effects.productivity += (decimal)baseEffect.productivity;
+                effects.speed += (decimal)baseEffect.speed;
+                effects.consumption += (decimal)baseEffect.consumption;
             }
 
             if (recipe?.recipe.target is Recipe actualRecipe) {
                 Dictionary<Technology, int> levels = Project.current.settings.productivityTechnologyLevels;
                 foreach ((Technology productivityTechnology, float changePerLevel) in actualRecipe.technologyProductivity) {
                     if (levels.TryGetValue(productivityTechnology, out int productivityTechLevel)) {
-                        effects.productivity += changePerLevel * productivityTechLevel;
+                        effects.productivity += (decimal)(changePerLevel * productivityTechLevel);
                     }
                 }
 
-                effects.productivity = Math.Min(effects.productivity, actualRecipe.maximumProductivity ?? float.MaxValue);
+                effects.productivity = Math.Min(effects.productivity, (decimal)(actualRecipe.maximumProductivity ?? float.MaxValue));
             }
 
             if (recipe != null) {
-                float craftingSpeed = (recipe.entity?.GetCraftingSpeed() ?? 1f) * effects.speedMod;
+                float craftingSpeed = (recipe.entity?.GetCraftingSpeed() ?? 1f) * (float)effects.speedMod;
                 gui.BuildText(LSs.ModuleCustomizationCurrentEffects, Font.subheader);
                 gui.BuildText(LSs.ModuleCustomizationProductivityBonus.L(DataUtils.FormatAmount(effects.productivity, UnitOfMeasure.Percent)));
                 gui.BuildText(LSs.ModuleCustomizationSpeedBonus.L(DataUtils.FormatAmount(effects.speedMod - 1, UnitOfMeasure.Percent), DataUtils.FormatAmount(craftingSpeed, UnitOfMeasure.None)));
@@ -178,7 +178,7 @@ public class ModuleCustomizationScreen : PseudoScreenWithResult<ModuleTemplateBu
                 string energyUsageLine = LSs.ModuleCustomizationEnergyUsage.L(DataUtils.FormatAmount(effects.energyUsageMod, UnitOfMeasure.Percent));
 
                 if (recipe.entity != null) {
-                    float power = effects.energyUsageMod * recipe.entity.GetPower() / recipe.entity.target.energy.effectivity;
+                    float power = (float)effects.energyUsageMod * recipe.entity.GetPower() / recipe.entity.target.energy.effectivity;
                     if (!recipe.recipe.target.flags.HasFlagAny(RecipeFlags.UsesFluidTemperature | RecipeFlags.ScaleProductionWithPower) && recipe.entity != null) {
                         energyUsageLine = LSs.ModuleCustomizationEnergyUsagePerBuilding.L(DataUtils.FormatAmount(effects.energyUsageMod, UnitOfMeasure.Percent),
                             DataUtils.FormatAmount(power, UnitOfMeasure.Megawatt));
@@ -186,7 +186,7 @@ public class ModuleCustomizationScreen : PseudoScreenWithResult<ModuleTemplateBu
 
                     gui.BuildText(energyUsageLine);
 
-                    float pps = craftingSpeed * (1f + MathF.Max(0f, effects.productivity)) / recipe.recipe.target.time;
+                    float pps = craftingSpeed * (1f + MathF.Max(0f, (float)effects.productivity)) / recipe.recipe.target.time;
                     gui.BuildText(LSs.ModuleCustomizationOverallSpeed.L(DataUtils.FormatAmount(pps, UnitOfMeasure.PerSecond)));
                     gui.BuildText(LSs.ModuleCustomizationEnergyCostPerOutput.L(DataUtils.FormatAmount(power / pps, UnitOfMeasure.Megajoule)));
                 }
@@ -293,7 +293,7 @@ public class ModuleCustomizationScreen : PseudoScreenWithResult<ModuleTemplateBu
             }
             else {
                 int beaconCount = (modules.beaconList.Sum(x => x.fixedCount) - 1) / beacon.target.moduleSlots + 1;
-                effects.AddModules(module, fixedCount * beacon.GetBeaconEfficiency() * beacon.target.GetProfile(beaconCount));
+                effects.AddModules(module, (decimal)(fixedCount * beacon.GetBeaconEfficiency() * beacon.target.GetProfile(beaconCount)));
             }
         }
 

@@ -77,7 +77,7 @@ public class AutoPlanner(ModelObject page) : ProjectPageContents(page) {
                 }
 
                 if (processedRecipes[recipe] is Variable var) {
-                    constraint.SetCoefficient(var, constraint.GetCoefficient(var) + recipe.GetProductionPerRecipe(item));
+                    constraint.SetCoefficient(var, constraint.GetCoefficient(var) + DataUtils.SafeToDouble(recipe.GetProductionPerRecipe(item)));
                 }
                 else {
                     allRecipes.Add(recipe);
@@ -87,7 +87,7 @@ public class AutoPlanner(ModelObject page) : ProjectPageContents(page) {
 
                     foreach (var product in recipe.products) {
                         if (processedGoods[product.goods] is Constraint constr && !processingStack.Contains(product.goods)) {
-                            constr.SetCoefficient(var, constr.GetCoefficient(var) + product.amount);
+                            constr.SetCoefficient(var, constr.GetCoefficient(var) + DataUtils.SafeToDouble(product.amount));
                         }
                     }
 
@@ -99,13 +99,13 @@ public class AutoPlanner(ModelObject page) : ProjectPageContents(page) {
                         }
 
                         if (processedGoods[ingredient.goods] is Constraint constr) {
-                            constr.SetCoefficient(var, constr.GetCoefficient(var) - ingredient.amount);
+                            constr.SetCoefficient(var, constr.GetCoefficient(var) - DataUtils.SafeToDouble(ingredient.amount));
                         }
                         else {
                             constr = bestFlowSolver.MakeConstraint(0, double.PositiveInfinity, ingredient.goods.name);
                             processedGoods[ingredient.goods] = constr;
                             processingStack.Enqueue(ingredient.goods);
-                            constr.SetCoefficient(var, -ingredient.amount);
+                            constr.SetCoefficient(var, -DataUtils.SafeToDouble(ingredient.amount));
                         }
                     }
                 }

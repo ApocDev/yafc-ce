@@ -116,7 +116,7 @@ public class ModuleFillerParameters : ModelObject<ModelObject> {
         BeaconConfiguration beaconsToUse = GetBeaconsForCrafter(entity);
         if (!recipe.flags.HasFlags(RecipeFlags.UsesMiningProductivity) && beaconsToUse.beacon != null && beaconsToUse.beaconModule != null) {
             EntityBeacon beacon = beaconsToUse.beacon.target;
-            effects.AddModules(beaconsToUse.beaconModule, beaconsToUse.beaconCount * beaconsToUse.beacon.GetBeaconEfficiency() * beacon.GetProfile(beaconsToUse.beaconCount) * beacon.moduleSlots, entity.allowedEffects);
+            effects.AddModules(beaconsToUse.beaconModule, (decimal)(beaconsToUse.beaconCount * beaconsToUse.beacon.GetBeaconEfficiency() * beacon.GetProfile(beaconsToUse.beaconCount) * beacon.moduleSlots), entity.allowedEffects);
             used.beacon = beaconsToUse.beacon;
             used.beaconCount = beaconsToUse.beaconCount;
         }

@@ -271,9 +271,9 @@ internal partial class FactorioDataDeserializer {
                 recipe.flags |= RecipeFlags.UsesFluidTemperature;
                 // TODO: input fluid amount now depends on its temperature, using min temperature should be OK for non-modded
                 float inputEnergyPerOneFluid = (targetTemp - acceptTemperature.min) * input.heatCapacity;
-                recipe.ingredients = [new Ingredient(input, boiler.basePower / inputEnergyPerOneFluid) { temperature = acceptTemperature }];
+                recipe.ingredients = [new Ingredient(input, (decimal)(boiler.basePower / inputEnergyPerOneFluid)) { temperature = acceptTemperature }];
                 float outputEnergyPerOneFluid = (targetTemp - output.temperatureRange.min) * output.heatCapacity;
-                recipe.products = [new Product(output, boiler.basePower / outputEnergyPerOneFluid)];
+                recipe.products = [new Product(output, (decimal)(boiler.basePower / outputEnergyPerOneFluid))];
                 recipe.time = 1f;
                 boiler.baseCraftingSpeed = 1f;
                 break;
@@ -472,7 +472,7 @@ internal partial class FactorioDataDeserializer {
                     pump.energy = voidEntityEnergy;
 
                     if (recipe.products == null) {
-                        recipe.products = [new Product(pumpingFluid, 1200f)]; // set to Factorio default pump amounts - looks nice in tooltip
+                        recipe.products = [new Product(pumpingFluid, 1200m)]; // set to Factorio default pump amounts - looks nice in tooltip
                         recipe.ingredients = [];
                         recipe.time = 1f;
                     }
@@ -535,7 +535,7 @@ internal partial class FactorioDataDeserializer {
 
         if (table.Get("loot", out LuaTable? lootList)) {
             entity.loot = [.. lootList.ArrayElements<LuaTable>().Select(x => {
-                Product product = new Product(GetObject<Item>(x.Get("item", "")), x.Get("count_min", 1f), x.Get("count_max", 1f), x.Get("probability", 1f));
+                Product product = new Product(GetObject<Item>(x.Get("item", "")), (decimal)x.Get("count_min", 1f), (decimal)x.Get("count_max", 1f), (decimal)x.Get("probability", 1f));
                 return product;
             })];
         }
@@ -555,7 +555,7 @@ internal partial class FactorioDataDeserializer {
 
                 if (minable.Get("required_fluid", out string? requiredFluid)) {
                     _ = minable.Get("fluid_amount", out float amount);
-                    recipe.ingredients = [new Ingredient(GetObject<Fluid>(requiredFluid), amount / 10f)]; // 10x difference is correct but why?
+                    recipe.ingredients = [new Ingredient(GetObject<Fluid>(requiredFluid), (decimal)(amount / 10f))]; // 10x difference is correct but why?
                     foreach (var tech in allObjects.OfType<Technology>().Where(t => t.unlocksFluidMining)) {
                         // Maybe incorrect: Leave the mining recipe enabled if no technologies unlock fluid mining
                         recipe.enabled = false;

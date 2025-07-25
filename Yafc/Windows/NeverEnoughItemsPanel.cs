@@ -35,7 +35,7 @@ public class NeverEnoughItemsPanel : PseudoScreen, IComparer<NeverEnoughItemsPan
 
         public RecipeEntry(Recipe recipe, bool isProduction, Goods currentItem, bool atCurrentMilestones) {
             this.recipe = recipe;
-            float amount = isProduction ? recipe.GetProductionPerRecipe(currentItem) : recipe.GetConsumptionPerRecipe(currentItem);
+            float amount = isProduction ? (float)recipe.GetProductionPerRecipe(currentItem) : (float)recipe.GetConsumptionPerRecipe(currentItem);
             recipeFlow = recipe.ApproximateFlow(atCurrentMilestones);
             flow = recipeFlow * amount;
             specificEfficiency = isProduction ? recipe.Cost() / amount : 0f;
@@ -120,7 +120,7 @@ public class NeverEnoughItemsPanel : PseudoScreen, IComparer<NeverEnoughItemsPan
             return;
         }
         foreach (var ingredient in recipe.ingredients) {
-            if (gui.BuildFactorioObjectWithAmount(ingredient.goods, ingredient.amount, ButtonDisplayStyle.NeieSmall) == Click.Left) {
+            if (gui.BuildFactorioObjectWithAmount(ingredient.goods, (float)ingredient.amount, ButtonDisplayStyle.NeieSmall) == Click.Left) {
                 if (ingredient.variants != null) {
                     gui.ShowDropDown(imGui => imGui.BuildInlineObjectListAndButton(ingredient.variants, SetItem, new(LSs.NeieAcceptedVariants)));
                 }
@@ -138,7 +138,7 @@ public class NeverEnoughItemsPanel : PseudoScreen, IComparer<NeverEnoughItemsPan
         }
         for (int i = recipe.products.Length - 1; i >= 0; i--) {
             var product = recipe.products[i];
-            if (gui.BuildFactorioObjectWithAmount(product.goods, product.amount, ButtonDisplayStyle.NeieSmall) == Click.Left) {
+            if (gui.BuildFactorioObjectWithAmount(product.goods, (float)product.amount, ButtonDisplayStyle.NeieSmall) == Click.Left) {
                 changing = product.goods;
             }
         }

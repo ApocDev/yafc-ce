@@ -9,31 +9,31 @@ using Yafc.UI;
 namespace Yafc.Model;
 
 public struct ModuleEffects {
-    public float speed;
-    public float productivity;
-    public float consumption;
-    public float quality;
+    public decimal speed;
+    public decimal productivity;
+    public decimal consumption;
+    public decimal quality;
 
-    public readonly float speedMod => MathF.Max(1f + speed, 0.2f);
-    public readonly float energyUsageMod => MathF.Max(1f + consumption, 0.2f);
-    public readonly float qualityMod => MathF.Max(quality, 0);
-    public void AddModules(IObjectWithQuality<Module> module, float count, AllowedEffects allowedEffects = AllowedEffects.All) {
+    public readonly decimal speedMod => Math.Max(1m + speed, 0.2m);
+    public readonly decimal energyUsageMod => Math.Max(1m + consumption, 0.2m);
+    public readonly decimal qualityMod => Math.Max(quality, 0);
+    public void AddModules(IObjectWithQuality<Module> module, decimal count, AllowedEffects allowedEffects = AllowedEffects.All) {
         ModuleSpecification spec = module.target.moduleSpecification;
         Quality quality = module.quality;
         if (allowedEffects.HasFlags(AllowedEffects.Speed)) {
-            speed += spec.Speed(quality) * count;
+            speed += (decimal)spec.Speed(quality) * count;
         }
 
         if (allowedEffects.HasFlags(AllowedEffects.Productivity) && spec.baseProductivity > 0f) {
-            productivity += spec.Productivity(quality) * count;
+            productivity += (decimal)spec.Productivity(quality) * count;
         }
 
         if (allowedEffects.HasFlags(AllowedEffects.Consumption)) {
-            consumption += spec.Consumption(quality) * count;
+            consumption += (decimal)spec.Consumption(quality) * count;
         }
 
         if (allowedEffects.HasFlags(AllowedEffects.Quality)) {
-            this.quality += spec.Quality(quality) * count;
+            this.quality += (decimal)spec.Quality(quality) * count;
         }
     }
 
@@ -46,7 +46,7 @@ public struct ModuleEffects {
         }
 
         if (spec.baseConsumption < 0f) {
-            return MathUtils.Clamp(MathUtils.Ceil(-(consumption + 0.8f) / spec.Consumption(quality)), 0, hardLimit);
+            return MathUtils.Clamp(MathUtils.Ceil(-(float)(consumption + 0.8m) / spec.Consumption(quality)), 0, hardLimit);
         }
 
         return 0;
@@ -141,7 +141,7 @@ public class ModuleTemplate : ModelObject<ModelObject> {
                 foreach (var module in beaconList) {
                     beaconedModules += module.fixedCount;
                     buffer.Add((module.module, module.fixedCount, true));
-                    effects.AddModules(module.module, beaconEfficiency * module.fixedCount);
+                    effects.AddModules(module.module, (decimal)beaconEfficiency * module.fixedCount);
                 }
 
                 used.beacon = beacon;
@@ -358,11 +358,11 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
                 }
                 else {
                     // We're changing the fuel and at least one of the current or new fuel burns to the fixed product
-                    float oldAmount = product.Amount;
+                    float oldAmount = (float)product.Amount;
 
                     _fuel = value;
                     parameters = RecipeParameters.CalculateParameters(this);
-                    float newAmount = Products.First(p => p.Goods == fixedProduct).Amount;
+                    float newAmount = (float)Products.First(p => p.Goods == fixedProduct).Amount;
 
                     fixedBuildings *= oldAmount / newAmount;
                 }
@@ -481,7 +481,7 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
     public HashSet<FactorioObject> variants { get; } = [];
     [SkipSerialization] public ProductionTable linkRoot => subgroup ?? owner;
 
-    public RecipeRowIngredient FuelInformation => new(fuel, fuelUsagePerSecond, links.fuel, (fuel?.target as Fluid)?.variants?.ToArray());
+    public RecipeRowIngredient FuelInformation => new(fuel, (decimal)fuelUsagePerSecond, links.fuel, (fuel?.target as Fluid)?.variants?.ToArray());
     public IEnumerable<RecipeRowIngredient> Ingredients {
         get {
             if (hierarchyEnabled) {
@@ -500,7 +500,7 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
         for (int i = 0; i < recipe.target.ingredients.Length; i++) {
             Ingredient ingredient = recipe.target.ingredients[i];
             IObjectWithQuality<Goods> option = (ingredient.variants == null ? ingredient.goods : GetVariant(ingredient.variants)).With(recipe.quality);
-            yield return (option, ingredient.amount * factor, links.ingredients[i], i, ingredient.variants);
+            yield return (option, ingredient.amount * (decimal)factor, links.ingredients[i], i, ingredient.variants);
         }
     }
 
@@ -530,7 +530,7 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
             // Fill upgradeProbabilities with "this quality or better" probabilities.
             while (quality != null && quality < Quality.MaxAccessible) {
                 runningProbability *= quality.UpgradeChance;
-                upgradeProbabilities.Add(Math.Min(1, runningProbability * parameters.activeEffects.qualityMod));
+                upgradeProbabilities.Add(Math.Min(1, runningProbability * (float)parameters.activeEffects.qualityMod));
                 quality = quality.nextQuality;
             }
             // Subtract the "next quality or better" probabilities to get just the "exactly this quality" probability.
@@ -543,23 +543,23 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
             Product product = recipe.target.products[i];
 
             Quality quality = recipe.quality;
-            float baseAmount = product.GetAmountPerRecipe(parameters.productivity);
+            decimal baseAmount = product.GetAmountPerRecipe(parameters.productivity);
             if (product.goods is Fluid || product.goods == Database.science.target) {
                 // Upgrade chances don't affect fluids or science
-                yield return (product.goods.With(Quality.Normal), baseAmount * factor, links.products[i, Quality.Normal], i, product.percentSpoiled);
+                yield return (product.goods.With(Quality.Normal), baseAmount * (decimal)factor, links.products[i, Quality.Normal], i, product.percentSpoiled);
             }
             else {
                 for (int j = 0; j < upgradeProbabilities.Count; j++) {
                     // The result amount for this quality is the normal output amount times the probability of this quality,
-                    float amount = baseAmount * upgradeProbabilities[j];
+                    decimal amount = baseAmount * (decimal)upgradeProbabilities[j];
                     if (!handledFuel && product.goods.With(quality) == spentFuel) {
                         // ... plus the spent fuel, if applicable.
-                        amount += parameters.fuelUsagePerSecondPerRecipe;
+                        amount += (decimal)parameters.fuelUsagePerSecondPerRecipe;
                         handledFuel = true;
                     }
 
                     if (amount > 0) {
-                        yield return (product.goods.With(quality), amount * factor, links.products[i, quality], i, product.percentSpoiled);
+                        yield return (product.goods.With(quality), amount * (decimal)factor, links.products[i, quality], i, product.percentSpoiled);
                     }
                     quality = quality.nextQuality!; // null-forgiving: upgradeProbabilities does not contain values for null qualities.
                 }
@@ -569,7 +569,7 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
         if (!handledFuel) {
             // null-forgiving (both): handledFuel is always false when running the solver.
             // equivalently: We do not enter this block when a non-null Goods is required.
-            yield return (spentFuel!, parameters.fuelUsagePerSecondPerRecipe * factor, links.spentFuel, 0, null);
+            yield return (spentFuel!, (decimal)parameters.fuelUsagePerSecondPerRecipe * (decimal)factor, links.spentFuel, 0, null);
         }
     }
 
@@ -736,16 +736,16 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
             }
             else if (row.fixedProduct != null) {
                 if (row.fixedProduct == Database.itemOutput) {
-                    float oldAmount = row.recipe.target.products.Where(p => p.goods is Item).Sum(p => p.GetAmountPerRecipe(oldParameters.productivity)) / oldParameters.recipeTime;
-                    float newAmount = row.recipe.target.products.Where(p => p.goods is Item).Sum(p => p.GetAmountPerRecipe(row.parameters.productivity)) / row.parameters.recipeTime;
+                    float oldAmount = (float)(row.recipe.target.products.Where(p => p.goods is Item).Sum(p => p.GetAmountPerRecipe(oldParameters.productivity)) / (decimal)oldParameters.recipeTime);
+                    float newAmount = (float)(row.recipe.target.products.Where(p => p.goods is Item).Sum(p => p.GetAmountPerRecipe(row.parameters.productivity)) / (decimal)row.parameters.recipeTime);
                     row.fixedBuildings *= oldAmount / newAmount; // step 3, for fixed combined production amount
                 }
                 else if (row.recipe.target.products.SingleOrDefault(p => p.goods == row.fixedProduct.target, false) is not Product product) {
                     row.fixedBuildings = 0; // We couldn't find the Product corresponding to fixedProduct. Just clear the fixed amount.
                 }
                 else {
-                    float oldAmount = product.GetAmountPerRecipe(oldParameters.productivity) / oldParameters.recipeTime;
-                    float newAmount = product.GetAmountPerRecipe(row.parameters.productivity) / row.parameters.recipeTime;
+                    float oldAmount = (float)(product.GetAmountPerRecipe(oldParameters.productivity) / (decimal)oldParameters.recipeTime);
+                    float newAmount = (float)(product.GetAmountPerRecipe(row.parameters.productivity) / (decimal)row.parameters.recipeTime);
                     row.fixedBuildings *= oldAmount / newAmount; // step 3, for fixed individual production amount
                 }
             }
@@ -872,6 +872,10 @@ public class ProductionLink(ProductionTable group, IObjectWithQuality<Goods> goo
     /// <inheritdoc/>
     public HashSet<IRecipeRow> capturedRecipes { get; } = [];
     internal int solverIndex;
+    /// <summary>
+    /// Contains the items that are part of the feedback loop when LinkRecursiveNotMatched flag is set.
+    /// </summary>
+    internal IObjectWithQuality<Goods>[]? loopItems;
 
     // To avoid leaking these variables/methods (or just the setter, for recipesPerSecond) into public context,
     // these explicit interface implementations connect to internal members, instead of using implicit implementation via public members
@@ -901,7 +905,25 @@ public class ProductionLink(ProductionTable group, IObjectWithQuality<Goods> goo
 
             if (flags.HasFlags(Flags.LinkRecursiveNotMatched)) {
                 if (notMatchedFlow <= 0f) {
-                    yield return LSs.LinkWarningNegativeFeedback;
+                    if (loopItems != null && loopItems.Length > 0) {
+                        // Show the most problematic items first (they're already sorted by the analysis)
+                        const int maxItemsToShow = 3;
+                        var topProblematicItems = loopItems.Take(maxItemsToShow).Select(item => item.target.locName);
+                        string itemList = string.Join(", ", topProblematicItems);
+
+                        if (loopItems.Length > maxItemsToShow) {
+                            yield return $"Circular dependency detected ({loopItems.Length} items). Most likely causes: {itemList}. Check these items first for production loops.";
+                        }
+                        else if (loopItems.Length > 1) {
+                            yield return $"Circular dependency detected. Most likely causes: {itemList}. Check these items for production loops.";
+                        }
+                        else {
+                            yield return $"Circular dependency detected involving: {itemList}. Check production chain for loops.";
+                        }
+                    }
+                    else {
+                        yield return LSs.LinkWarningNegativeFeedback;
+                    }
                 }
                 else {
                     yield return LSs.LinkWarningNeedsOverproduction;
@@ -922,7 +944,7 @@ public class ProductionLink(ProductionTable group, IObjectWithQuality<Goods> goo
 /// <summary>
 /// An ingredient for a recipe row, as reported to the UI.
 /// </summary>
-public record RecipeRowIngredient(IObjectWithQuality<Goods>? Goods, float Amount, ProductionLink? Link, Goods[]? Variants) {
+public record RecipeRowIngredient(IObjectWithQuality<Goods>? Goods, decimal Amount, ProductionLink? Link, Goods[]? Variants) {
     /// <summary>
     /// Convert from a <see cref="SolverIngredient"/> (the form initially generated when reporting ingredients) to a
     /// <see cref="RecipeRowIngredient"/>.
@@ -934,7 +956,7 @@ public record RecipeRowIngredient(IObjectWithQuality<Goods>? Goods, float Amount
 /// <summary>
 /// A product from a recipe row, as reported to the UI.
 /// </summary>
-public record RecipeRowProduct(IObjectWithQuality<Goods>? Goods, float Amount, IProductionLink? Link, float? PercentSpoiled) {
+public record RecipeRowProduct(IObjectWithQuality<Goods>? Goods, decimal Amount, IProductionLink? Link, decimal? PercentSpoiled) {
     /// <summary>
     /// Convert from a <see cref="SolverProduct"/> (the form initially generated when reporting products) to a <see cref="RecipeRowProduct"/>.
     /// </summary>
@@ -946,8 +968,8 @@ public record RecipeRowProduct(IObjectWithQuality<Goods>? Goods, float Amount, I
 /// An ingredient for a recipe row, as reported to the solver.
 /// Alternatively, an intermediate value that will be used by the UI after conversion using <see cref="RecipeRowIngredient.FromSolver"/>.
 /// </summary>
-internal record SolverIngredient(IObjectWithQuality<Goods> Goods, float Amount, IProductionLink? Link, int LinkIndex, Goods[]? Variants) {
-    public static implicit operator SolverIngredient((IObjectWithQuality<Goods> Goods, float Amount, IProductionLink? Link, int LinkIndex, Goods[]? Variants) value)
+internal record SolverIngredient(IObjectWithQuality<Goods> Goods, decimal Amount, IProductionLink? Link, int LinkIndex, Goods[]? Variants) {
+    public static implicit operator SolverIngredient((IObjectWithQuality<Goods> Goods, decimal Amount, IProductionLink? Link, int LinkIndex, Goods[]? Variants) value)
         => new(value.Goods, value.Amount, value.Link, value.LinkIndex, value.Variants);
 }
 
@@ -955,7 +977,7 @@ internal record SolverIngredient(IObjectWithQuality<Goods> Goods, float Amount, 
 /// A product for a recipe row, as reported to the solver.
 /// Alternatively, an intermediate value that will be used by the UI after conversion using <see cref="RecipeRowProduct.FromSolver"/>.
 /// </summary>
-internal record SolverProduct(IObjectWithQuality<Goods> Goods, float Amount, IProductionLink? Link, int LinkIndex, float? PercentSpoiled) {
-    public static implicit operator SolverProduct((IObjectWithQuality<Goods> Goods, float Amount, IProductionLink? Link, int LinkIndex, float? PercentSpoiled) value)
+internal record SolverProduct(IObjectWithQuality<Goods> Goods, decimal Amount, IProductionLink? Link, int LinkIndex, decimal? PercentSpoiled) {
+    public static implicit operator SolverProduct((IObjectWithQuality<Goods> Goods, decimal Amount, IProductionLink? Link, int LinkIndex, decimal? PercentSpoiled) value)
         => new(value.Goods, value.Amount, value.Link, value.LinkIndex, value.PercentSpoiled);
 }

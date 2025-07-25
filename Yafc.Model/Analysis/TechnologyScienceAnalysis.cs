@@ -77,7 +77,7 @@ public class TechnologyScienceAnalysis : Analysis {
                 if (!prerequisite.flags.HasFlagAny(RecipeFlags.HasResearchTriggerMask)) {
                     foreach (var ingredient in prerequisite.ingredients) {
                         int science = sciencePackIndex[ingredient.goods];
-                        sciencePackCount[science][current] += ingredient.amount * prerequisite.count;
+                        sciencePackCount[science][current] += (float)(ingredient.amount * (decimal)prerequisite.count);
                     }
                 }
 
@@ -106,6 +106,6 @@ locked:;
         }
 
         allSciencePacks = Database.technologies.CreateMapping(
-            tech => sciencePackCount.Select((x, id) => x[tech] == 0 ? null : new Ingredient(sciencePacks[id], x[tech])).WhereNotNull().ToArray());
+            tech => sciencePackCount.Select((x, id) => x[tech] == 0 ? null : new Ingredient(sciencePacks[id], (decimal)x[tech])).WhereNotNull().ToArray());
     }
 }

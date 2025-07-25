@@ -26,6 +26,7 @@ public enum WarningFlags {
     DeadlockCandidate = 1 << 16,
     OverproductionRequired = 1 << 17,
     ExceedsBuiltCount = 1 << 18,
+    SolverInfeasible = 1 << 19,
 
     // Not implemented warnings
     TemperatureForIngredientNotMatch = 1 << 24,
@@ -40,7 +41,7 @@ public struct UsedModule {
 internal class RecipeParameters(float recipeTime, float fuelUsagePerSecondPerBuilding, WarningFlags warningFlags, ModuleEffects activeEffects, UsedModule modules) {
     public float recipeTime { get; } = recipeTime;
     public float fuelUsagePerSecondPerBuilding { get; } = fuelUsagePerSecondPerBuilding;
-    public float productivity => activeEffects.productivity;
+    public decimal productivity => activeEffects.productivity;
     public WarningFlags warningFlags { get; internal set; } = warningFlags;
     public ModuleEffects activeEffects { get; } = activeEffects;
     public UsedModule modules { get; } = modules;
@@ -172,17 +173,17 @@ internal class RecipeParameters(float recipeTime, float fuelUsagePerSecondPerBui
                 }
             }
 
-            activeEffects.productivity += productivity;
-            activeEffects.speed += speed;
-            activeEffects.consumption += consumption;
+            activeEffects.productivity += (decimal)productivity;
+            activeEffects.speed += (decimal)speed;
+            activeEffects.consumption += (decimal)consumption;
 
-            if (recipe.target is Recipe { maximumProductivity: float maxProd } && activeEffects.productivity > maxProd) {
+            if (recipe.target is Recipe { maximumProductivity: float maxProd } && activeEffects.productivity > (decimal)maxProd) {
                 warningFlags |= WarningFlags.ExcessProductivity;
-                activeEffects.productivity = maxProd;
+                activeEffects.productivity = (decimal)maxProd;
             }
 
-            recipeTime /= activeEffects.speedMod;
-            fuelUsagePerSecondPerBuilding *= activeEffects.energyUsageMod;
+            recipeTime /= (float)activeEffects.speedMod;
+            fuelUsagePerSecondPerBuilding *= (float)activeEffects.energyUsageMod;
 
             if (energy.drain > 0f) {
                 fuelUsagePerSecondPerBuilding += energy.drain / energyPerUnitOfFuel;

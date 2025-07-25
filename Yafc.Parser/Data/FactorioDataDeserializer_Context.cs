@@ -93,12 +93,12 @@ internal partial class FactorioDataDeserializer {
         formerAliases["Special.research-unit"] = science;
 
         generatorProduction = CreateSpecialRecipe(electricity, SpecialNames.GeneratorRecipe, LSs.SpecialRecipeGenerating);
-        generatorProduction.products = [new Product(electricity, 1f)];
+        generatorProduction.products = [new Product(electricity, 1m)];
         generatorProduction.flags |= RecipeFlags.ScaleProductionWithPower;
         generatorProduction.ingredients = [];
 
         reactorProduction = CreateSpecialRecipe(heat, SpecialNames.ReactorRecipe, LSs.SpecialRecipeGenerating);
-        reactorProduction.products = [new Product(heat, 1f)];
+        reactorProduction.products = [new Product(heat, 1m)];
         reactorProduction.flags |= RecipeFlags.ScaleProductionWithPower;
         reactorProduction.ingredients = [];
 
@@ -242,7 +242,7 @@ internal partial class FactorioDataDeserializer {
         var packedProduct = packing.products[0];
 
         // Check for deterministic production
-        if (packedProduct.probability != 1f || unpacking.products.Any(p => p.probability != 1)) {
+        if (packedProduct.probability != 1m || unpacking.products.Any(p => p.probability != 1)) {
             return false;
         }
         if (packedProduct.amountMin != packedProduct.amountMax || unpacking.products.Any(p => p.amountMin != p.amountMax)) {
@@ -278,7 +278,7 @@ internal partial class FactorioDataDeserializer {
                     return false; // Refuse to deal with duplicate ingredients.
                 }
 
-                ingredients[item.goods] = item.amount;
+                ingredients[item.goods] = (float)item.amount;
             }
 
             foreach (var item in second.products) {
@@ -286,19 +286,19 @@ internal partial class FactorioDataDeserializer {
                     return false;
                 }
 
-                if (count > item.amount) {
-                    if (!checkProportions(first, count, item.amount, ref ratio, ref larger)) {
+                if (count > (float)item.amount) {
+                    if (!checkProportions(first, count, (float)item.amount, ref ratio, ref larger)) {
                         return false;
                     }
                 }
-                else if (count == item.amount) {
+                else if (count == (float)item.amount) {
                     if (ratio != 0 && ratio != 1) {
                         return false;
                     }
                     ratio = 1;
                 }
                 else {
-                    if (!checkProportions(second, item.amount, count, ref ratio, ref larger)) {
+                    if (!checkProportions(second, (float)item.amount, count, ref ratio, ref larger)) {
                         return false;
                     }
                 }
@@ -368,8 +368,8 @@ internal partial class FactorioDataDeserializer {
                         // If the ingredient has variants and is an output, we aren't doing catalyst things: water@15-90 to water@90 does produce water@90,
                         // even if it consumes 10 water@15-90 to produce 9 water@90.
                         Ingredient? ingredient = recipe.ingredients.FirstOrDefault(i => i.goods == product.Key && i.variants is null);
-                        float inputAmount = netProduction ? (ingredient?.amount ?? 0) : 0;
-                        float outputAmount = product.Sum(p => p.amount);
+                        float inputAmount = netProduction ? (float)(ingredient?.amount ?? 0) : 0;
+                        float outputAmount = (float)product.Sum(p => p.amount);
 
                         if (outputAmount > inputAmount) {
                             itemProduction.Add(product.Key, recipe);
@@ -378,9 +378,9 @@ internal partial class FactorioDataDeserializer {
 
                     foreach (var ingredient in recipe.ingredients) {
                         // The reverse also applies. 9 water@15-90 to produce 10 water@15 consumes water@90, even though it's a net water producer.
-                        float inputAmount = ingredient.amount;
+                        float inputAmount = (float)ingredient.amount;
                         IEnumerable<Product> products = recipe.products.Where(p => p.goods == ingredient.goods);
-                        float outputAmount = netProduction && ingredient.variants is null ? products.Sum(p => p.amount) : 0;
+                        float outputAmount = netProduction && ingredient.variants is null ? (float)products.Sum(p => p.amount) : 0;
 
                         if (ingredient.variants == null && inputAmount > outputAmount) {
                             itemUsages.Add(ingredient.goods, recipe);

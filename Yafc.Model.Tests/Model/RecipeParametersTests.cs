@@ -41,13 +41,13 @@ public class RecipeParametersTests {
             float expectedHeatExchangerAmount = 10000 / .2f / (500 - water[i].temperature);
             // Equation is boiler power (KW) / heat capacity (KJ/unit°C) / temperature change (°C) => unit/s
 
-            Assert.Equal(.45f, boiler.FuelInformation.Amount, .45f * .0001f); // Always .45 coal per second
-            Assert.Equal(expectedBoilerAmount, boiler.Ingredients.Single().Amount, expectedBoilerAmount * .0001f);
-            Assert.Equal(expectedBoilerAmount, boiler.Products.Single().Amount, expectedBoilerAmount * .0001f);
+            Assert.Equal(.45, (double)boiler.FuelInformation.Amount, .45 * .0001); // Always .45 coal per second
+            Assert.Equal(expectedBoilerAmount, (double)boiler.Ingredients.Single().Amount, (int)(expectedBoilerAmount * .0001f));
+            Assert.Equal(expectedBoilerAmount, (double)boiler.Products.Single().Amount, (int)(expectedBoilerAmount * .0001f));
 
-            Assert.Equal(10, heatExchanger.FuelInformation.Amount); // Always 10 MW heat
-            Assert.Equal(expectedHeatExchangerAmount, heatExchanger.Ingredients.Single().Amount, expectedHeatExchangerAmount * .0001f);
-            Assert.Equal(expectedHeatExchangerAmount, heatExchanger.Products.Single().Amount, expectedHeatExchangerAmount * .0001f);
+            Assert.Equal(10, (double)heatExchanger.FuelInformation.Amount); // Always 10 MW heat
+            Assert.Equal(expectedHeatExchangerAmount, (double)heatExchanger.Ingredients.Single().Amount, (int)(expectedHeatExchangerAmount * .0001f));
+            Assert.Equal(expectedHeatExchangerAmount, (double)heatExchanger.Products.Single().Amount, (int)(expectedHeatExchangerAmount * .0001f));
         }
     }
 }

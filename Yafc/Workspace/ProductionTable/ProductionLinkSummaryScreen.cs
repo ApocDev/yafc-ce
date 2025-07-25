@@ -286,9 +286,9 @@ public class ProductionLinkSummaryScreen : PseudoScreen, IComparer<(RecipeRow ro
     }
 
     private static float DetermineFlow(IObjectWithQuality<Goods> goods, RecipeRow recipe) {
-        float production = recipe.GetProductionForRow(goods);
-        float consumption = recipe.GetConsumptionForRow(goods);
-        float fuelUsage = recipe.fuel == goods ? recipe.FuelInformation.Amount : 0;
+        float production = (float)recipe.GetProductionForRow(goods);
+        float consumption = (float)recipe.GetConsumptionForRow(goods);
+        float fuelUsage = recipe.fuel == goods ? (float)recipe.FuelInformation.Amount : 0;
         float localFlow = production - consumption - fuelUsage;
         return localFlow;
     }

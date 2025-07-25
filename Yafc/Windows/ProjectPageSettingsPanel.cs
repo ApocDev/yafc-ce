@@ -169,9 +169,9 @@ public class ProjectPageSettingsPanel : PseudoScreen {
             Recipe = row.recipe.QualityName();
             Building = ObjectWithQuality.Get(row.entity);
             BuildingCount = row.buildingCount;
-            Fuel = new ExportMaterial(row.fuel?.QualityName() ?? LSs.ExportNoFuelSelected, row.FuelInformation.Amount);
-            Inputs = row.Ingredients.Select(i => new ExportMaterial(i.Goods?.QualityName() ?? LSs.ExportRecipeDisabled, i.Amount));
-            Outputs = row.Products.Select(p => new ExportMaterial(p.Goods?.QualityName() ?? LSs.ExportRecipeDisabled, p.Amount));
+            Fuel = new ExportMaterial(row.fuel?.QualityName() ?? LSs.ExportNoFuelSelected, (double)row.FuelInformation.Amount);
+            Inputs = row.Ingredients.Select(i => new ExportMaterial(i.Goods?.QualityName() ?? LSs.ExportRecipeDisabled, (double)i.Amount));
+            Outputs = row.Products.Select(p => new ExportMaterial(p.Goods?.QualityName() ?? LSs.ExportRecipeDisabled, (double)p.Amount));
             Beacon = ObjectWithQuality.Get(row.usedModules.beacon);
             BeaconCount = row.usedModules.beaconCount;
 

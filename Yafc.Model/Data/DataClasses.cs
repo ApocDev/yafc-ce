@@ -217,11 +217,11 @@ public class Mechanics : Recipe {
 }
 
 public class Ingredient : IFactorioObjectWrapper {
-    public readonly float amount;
+    public readonly decimal amount;
     public Goods goods { get; internal set; }
     public Goods[]? variants { get; internal set; }
     public TemperatureRange temperature { get; internal set; } = TemperatureRange.Any;
-    public Ingredient(Goods goods, float amount) {
+    public Ingredient(Goods goods, decimal amount) {
         this.goods = goods;
         this.amount = amount;
         if (goods is Fluid fluid) {
@@ -232,7 +232,7 @@ public class Ingredient : IFactorioObjectWrapper {
     string IFactorioObjectWrapper.text {
         get {
             string text = goods.locName;
-            if (amount != 1f) {
+            if (amount != 1m) {
                 text = LSs.IngredientAmount.L(amount, goods.locName);
             }
 
@@ -246,7 +246,7 @@ public class Ingredient : IFactorioObjectWrapper {
 
     FactorioObject IFactorioObjectWrapper.target => goods;
 
-    float IFactorioObjectWrapper.amount => amount;
+    float IFactorioObjectWrapper.amount => (float)amount;
 
     public bool ContainsVariant(Goods product) {
         if (goods == product) {
@@ -263,43 +263,43 @@ public class Ingredient : IFactorioObjectWrapper {
 
 public class Product : IFactorioObjectWrapper {
     public readonly Goods goods;
-    internal readonly float amountMin;
-    internal readonly float amountMax;
-    internal readonly float probability;
-    public readonly float amount; // This is average amount including probability and range
+    internal readonly decimal amountMin;
+    internal readonly decimal amountMax;
+    internal readonly decimal probability;
+    public readonly decimal amount; // This is average amount including probability and range
     /// <summary>
     /// Gets or sets the fixed freshness of this product: 0 if the recipe has result_is_always_fresh, or percent_spoiled from the
     /// ItemProductPrototype, or <see langword="null"/> if neither of those values are set.
     /// </summary>
-    public float? percentSpoiled { get; internal set; }
-    internal float productivityAmount { get; private set; }
+    public decimal? percentSpoiled { get; internal set; }
+    internal decimal productivityAmount { get; private set; }
 
-    public void SetCatalyst(float catalyst) {
-        float catalyticMin = amountMin - catalyst;
-        float catalyticMax = amountMax - catalyst;
+    public void SetCatalyst(decimal catalyst) {
+        decimal catalyticMin = amountMin - catalyst;
+        decimal catalyticMax = amountMax - catalyst;
 
         if (catalyticMax <= 0) {
-            productivityAmount = 0f;
+            productivityAmount = 0m;
         }
-        else if (catalyticMin >= 0f) {
-            productivityAmount = (catalyticMin + catalyticMax) * 0.5f * probability;
+        else if (catalyticMin >= 0m) {
+            productivityAmount = (catalyticMin + catalyticMax) * 0.5m * probability;
         }
         else {
             // TODO super duper rare case, might not be precise
-            productivityAmount = probability * catalyticMax * catalyticMax * 0.5f / (catalyticMax - catalyticMin);
+            productivityAmount = probability * catalyticMax * catalyticMax * 0.5m / (catalyticMax - catalyticMin);
         }
     }
 
-    internal float GetAmountForRow(RecipeRow row) => GetAmountPerRecipe(row.parameters.productivity) * (float)row.recipesPerSecond;
-    internal float GetAmountPerRecipe(float productivityBonus) => amount + (productivityBonus * productivityAmount);
+    internal decimal GetAmountForRow(RecipeRow row) => GetAmountPerRecipe(row.parameters.productivity) * (decimal)row.recipesPerSecond;
+    internal decimal GetAmountPerRecipe(decimal productivityBonus) => amount + (productivityBonus * productivityAmount);
 
-    public Product(Goods goods, float amount) {
+    public Product(Goods goods, decimal amount) {
         this.goods = goods;
         amountMin = amountMax = this.amount = productivityAmount = amount;
-        probability = 1f;
+        probability = 1m;
     }
 
-    public Product(Goods goods, float min, float max, float probability) {
+    public Product(Goods goods, decimal min, decimal max, decimal probability) {
         this.goods = goods;
         amountMin = min;
         amountMax = max;
@@ -350,7 +350,7 @@ public class Product : IFactorioObjectWrapper {
             return text;
         }
     }
-    float IFactorioObjectWrapper.amount => amount;
+    float IFactorioObjectWrapper.amount => (float)amount;
 
     public static Product operator *(Product product, int factor) =>
         new(product.goods, product.amountMin * factor, product.amountMax * factor, product.probability);

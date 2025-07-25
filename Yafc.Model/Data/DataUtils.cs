@@ -347,8 +347,8 @@ public static partial class DataUtils {
         }
     }
 
-    public static float GetProductionPerRecipe(this RecipeOrTechnology recipe, Goods product) {
-        float amount = 0f;
+    public static decimal GetProductionPerRecipe(this RecipeOrTechnology recipe, Goods product) {
+        decimal amount = 0m;
 
         foreach (var p in recipe.products) {
             if (p.goods == product) {
@@ -358,8 +358,8 @@ public static partial class DataUtils {
         return amount;
     }
 
-    public static float GetProductionForRow(this RecipeRow row, IObjectWithQuality<Goods> product) {
-        float amount = 0f;
+    public static decimal GetProductionForRow(this RecipeRow row, IObjectWithQuality<Goods> product) {
+        decimal amount = 0m;
 
         foreach (var p in row.Products) {
             if (p.Goods == product) {
@@ -369,8 +369,8 @@ public static partial class DataUtils {
         return amount;
     }
 
-    public static float GetConsumptionPerRecipe(this RecipeOrTechnology recipe, Goods product) {
-        float amount = 0f;
+    public static decimal GetConsumptionPerRecipe(this RecipeOrTechnology recipe, Goods product) {
+        decimal amount = 0m;
 
         foreach (var ingredient in recipe.ingredients) {
             if (ingredient.ContainsVariant(product)) {
@@ -380,18 +380,77 @@ public static partial class DataUtils {
         return amount;
     }
 
-    public static float GetConsumptionForRow(this RecipeRow row, IObjectWithQuality<Goods> ingredient) {
-        float amount = 0f;
+    public static decimal GetConsumptionForRow(this RecipeRow row, IObjectWithQuality<Goods> ingredient) {
+        decimal amount = 0m;
 
         foreach (var i in row.recipe.target.ingredients) {
             if (i.goods.With(row.recipe.quality) == ingredient || (ingredient.quality == Quality.Normal && i.ContainsVariant(ingredient.target))) {
-                amount += i.amount * (float)row.recipesPerSecond;
+                amount += i.amount * (decimal)row.recipesPerSecond;
             }
         }
         return amount;
     }
 
-    public static FactorioObjectComparer<Recipe> GetRecipeComparerFor(Goods goods) => new FactorioObjectComparer<Recipe>((x, y) => (x.Cost(true) / x.GetProductionPerRecipe(goods)).CompareTo(y.Cost(true) / y.GetProductionPerRecipe(goods)));
+    /// <summary>
+    /// Safely converts a float to decimal, handling infinity and out-of-range values
+    /// </summary>
+    public static decimal SafeToDecimal(float value) {
+        if (float.IsInfinity(value) || float.IsNaN(value)) {
+            return value > 0 ? decimal.MaxValue : decimal.MinValue;
+        }
+
+        // Check if the value is within decimal range
+        if (value > (float)decimal.MaxValue) {
+            return decimal.MaxValue;
+        }
+        if (value < (float)decimal.MinValue) {
+            return decimal.MinValue;
+        }
+
+        return (decimal)value;
+    }
+
+    /// <summary>
+    /// Safely converts a decimal to double, handling overflow and out-of-range values
+    /// </summary>
+    public static double SafeToDouble(decimal value) {
+        // Since decimal.MaxValue is smaller than double.MaxValue, any valid decimal can be converted to double
+        // We just need to handle the conversion and check for underflow to zero
+
+        double result = (double)value;
+
+        // Check for underflow to zero (very small numbers)
+        if (result == 0.0 && value != 0m) {
+            // If the decimal value is non-zero but converts to zero, use a minimal positive/negative value
+            return value > 0 ? double.Epsilon : -double.Epsilon;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Safely divides two decimal values, handling overflow and division by zero
+    /// </summary>
+    public static decimal SafeDecimalDivide(decimal numerator, decimal denominator) {
+        if (denominator == 0) {
+            return numerator >= 0 ? decimal.MaxValue : decimal.MinValue;
+        }
+
+        try {
+            return numerator / denominator;
+        }
+        catch (OverflowException) {
+            // If division would overflow, return max/min value based on signs
+            bool numeratorPositive = numerator >= 0;
+            bool denominatorPositive = denominator >= 0;
+            bool resultPositive = numeratorPositive == denominatorPositive;
+            return resultPositive ? decimal.MaxValue : decimal.MinValue;
+        }
+    }
+
+    public static FactorioObjectComparer<Recipe> GetRecipeComparerFor(Goods goods) => new FactorioObjectComparer<Recipe>((x, y) =>
+        SafeDecimalDivide(SafeToDecimal(x.Cost(true)), x.GetProductionPerRecipe(goods))
+        .CompareTo(SafeDecimalDivide(SafeToDecimal(y.Cost(true)), y.GetProductionPerRecipe(goods))));
 
     public static T? AutoSelect<T>(this IEnumerable<T> list, IComparer<T>? comparer = default) {
         if (comparer == null) {
@@ -569,6 +628,12 @@ public static partial class DataUtils {
         var (multiplier, unitSuffix) = Project.current == null ? (1f, null) : Project.current.ResolveUnitOfMeasure(unit);
 
         return FormatAmountRaw(amount, multiplier, unitSuffix, precise ? PreciseFormat : FormatSpec);
+    }
+
+    public static string FormatAmount(decimal amount, UnitOfMeasure unit, bool precise = false) {
+        var (multiplier, unitSuffix) = Project.current == null ? (1f, null) : Project.current.ResolveUnitOfMeasure(unit);
+
+        return FormatAmountRaw((float)amount, multiplier, unitSuffix, precise ? PreciseFormat : FormatSpec);
     }
 
     public static string FormatAmountRaw(float amount, float unitMultiplier, string? unitSuffix, (char suffix, float multiplier, string format)[] formatSpec) {

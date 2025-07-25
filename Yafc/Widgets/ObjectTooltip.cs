@@ -461,7 +461,7 @@ doneDrawing:;
 
             using (gui.EnterGroup(contentPadding)) {
                 gui.BuildText(LSs.ItemStackSize.L(item.stackSize));
-                gui.BuildText(LSs.ItemRocketCapacity.L(DataUtils.FormatAmount(item.rocketCapacity, UnitOfMeasure.None)));
+                gui.BuildText(LSs.ItemRocketCapacity.L(DataUtils.FormatAmount((float)item.rocketCapacity, UnitOfMeasure.None)));
             }
         }
     }
@@ -607,7 +607,7 @@ doneDrawing:;
             using (gui.EnterGroup(contentPadding)) {
                 using var grid = gui.EnterInlineGrid(3f);
                 grid.Next();
-                _ = gui.BuildFactorioObjectWithAmount(technology.ingredients[0].goods, technology.ingredients[0].amount, ButtonDisplayStyle.ProductionTableUnscaled);
+                _ = gui.BuildFactorioObjectWithAmount(technology.ingredients[0].goods, (float)technology.ingredients[0].amount, ButtonDisplayStyle.ProductionTableUnscaled);
             }
         }
         else if (isResearchTriggerCapture) {
@@ -663,7 +663,7 @@ doneDrawing:;
                 using var grid = gui.EnterInlineGrid(3f);
                 foreach (var pack in packs) {
                     grid.Next();
-                    _ = gui.BuildFactorioObjectWithAmount(pack.goods, pack.amount, ButtonDisplayStyle.ProductionTableUnscaled);
+                    _ = gui.BuildFactorioObjectWithAmount(pack.goods, (float)pack.amount, ButtonDisplayStyle.ProductionTableUnscaled);
                 }
             }
         }

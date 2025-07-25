@@ -332,7 +332,7 @@ match:
     private static void AddFlow(RecipeRow recipe, Dictionary<IObjectWithQuality<Goods>, (double prod, double cons)> summer) {
         foreach (var product in recipe.Products) {
             _ = summer.TryGetValue(product.Goods!, out var prev); // Null-forgiving: recipe is always enabled, so products are never blank.
-            double amount = product.Amount;
+            double amount = DataUtils.SafeToDouble(product.Amount);
             prev.prod += amount;
             summer[product.Goods!] = prev;
         }
@@ -342,7 +342,7 @@ match:
 
             if (linkedGoods is not null) {
                 _ = summer.TryGetValue(linkedGoods, out var prev);
-                prev.cons += ingredient.Amount;
+                prev.cons += DataUtils.SafeToDouble(ingredient.Amount);
                 summer[linkedGoods] = prev;
             }
             else {
@@ -446,7 +446,7 @@ match:
             var variable = productionTableSolver.MakeNumVar(0f, double.PositiveInfinity, recipe.SolverName);
 
             if (recipe.fixedBuildings > 0f) {
-                double fixedRps = (double)recipe.fixedBuildings / recipe.parameters.recipeTime;
+                double fixedRps = DataUtils.SafeToDouble((decimal)recipe.fixedBuildings / (decimal)recipe.parameters.recipeTime);
                 variable.SetBounds(fixedRps, fixedRps);
             }
             vars[i] = variable;
@@ -470,13 +470,13 @@ match:
             var links = recipe.links;
 
             foreach (var product in recipe.ProductsForSolver) {
-                if (product.Amount <= 0f) {
+                if (product.Amount <= 0m) {
                     continue;
                 }
 
                 if (recipe.FindLink(product.Goods, out var link)) {
                     link.flags |= ProductionLink.Flags.HasProduction;
-                    float added = product.Amount;
+                    float added = (float)product.Amount;
                     AddLinkCoefficient(constraints[link.solverIndex], recipeVar, link, recipe, added);
                     float cost = product.Goods.target.Cost();
 
@@ -491,7 +491,7 @@ match:
             foreach (var ingredient in recipe.IngredientsForSolver) {
                 if (recipe.FindLink(ingredient.Goods, out var link)) {
                     link.flags |= ProductionLink.Flags.HasConsumption;
-                    AddLinkCoefficient(constraints[link.solverIndex], recipeVar, link, recipe, -ingredient.Amount);
+                    AddLinkCoefficient(constraints[link.solverIndex], recipeVar, link, recipe, -(float)ingredient.Amount);
                 }
 
                 links.ingredients[ingredient.LinkIndex] = link as ProductionLink;
@@ -543,7 +543,7 @@ match:
 
         if (result is not Solver.ResultStatus.FEASIBLE and not Solver.ResultStatus.OPTIMAL) {
             objective.Clear();
-            var (deadlocks, splits) = GetInfeasibilityCandidates(allRecipes);
+            var (deadlocks, splits, loopItemsMap) = GetInfeasibilityCandidates(allRecipes);
             (Variable? positive, Variable? negative)[] slackVars = new (Variable? positive, Variable? negative)[allLinks.Count];
 
             // Solution does not exist. Adding slack variables to find the reason
@@ -595,6 +595,12 @@ match:
                     }
 
                     link.flags |= ProductionLink.Flags.LinkNotMatched | ProductionLink.Flags.LinkRecursiveNotMatched;
+
+                    // Store loop items if this link is part of a loop
+                    if (link is ProductionLink productionLink && loopItemsMap.TryGetValue(link, out var items)) {
+                        productionLink.loopItems = items;
+                    }
+
                     RecipeRow? ownerRecipe = link.owner.owner as RecipeRow;
 
                     while (ownerRecipe != null) {
@@ -626,6 +632,10 @@ match:
             }
             else {
                 if (result == Solver.ResultStatus.INFEASIBLE) {
+                    // Mark all recipes as having solver infeasibility issues for better error highlighting
+                    foreach (var recipe in allRecipes) {
+                        recipe.parameters.warningFlags |= WarningFlags.SolverInfeasible;
+                    }
                     return LSs.ProductionTableNoSolutionAndNoDeadlocks;
                 }
 
@@ -720,11 +730,12 @@ match:
         }
     }
 
-    private static (List<IProductionLink> merges, List<IProductionLink> splits) GetInfeasibilityCandidates(List<IRecipeRow> recipes) {
+    private static (List<IProductionLink> merges, List<IProductionLink> splits, Dictionary<IProductionLink, IObjectWithQuality<Goods>[]> loopItems) GetInfeasibilityCandidates(List<IRecipeRow> recipes) {
         Graph<IProductionLink> graph = new Graph<IProductionLink>();
         List<IProductionLink> sources = [];
         List<IProductionLink> targets = [];
         List<IProductionLink> splits = [];
+        Dictionary<IProductionLink, IObjectWithQuality<Goods>[]> loopItems = [];
 
         foreach (var recipe in recipes) {
             FindAllRecipeLinks(recipe, sources, targets);
@@ -749,6 +760,12 @@ match:
                 var last = list[^1];
                 sources.Add(last);
 
+                // Analyze the loop to find the most problematic items
+                var analyzedLoop = AnalyzeCircularDependency(list);
+                foreach (var link in list) {
+                    loopItems[link] = analyzedLoop;
+                }
+
                 for (int i = 0; i < list.Length - 1; i++) {
                     for (int j = i + 2; j < list.Length; j++) {
                         if (graph.HasConnection(list[i], list[j])) {
@@ -760,7 +777,60 @@ match:
             }
         }
 
-        return (sources, splits);
+        return (sources, splits, loopItems);
+    }
+
+    /// <summary>
+    /// Analyzes a circular dependency to identify the most problematic items.
+    /// Returns items ordered by their importance in the loop (most problematic first).
+    /// </summary>
+    private static IObjectWithQuality<Goods>[] AnalyzeCircularDependency(IProductionLink[] loopLinks) {
+        // Create a dictionary to track how many times each item appears in the loop
+        Dictionary<IObjectWithQuality<Goods>, int> itemFrequency = [];
+        Dictionary<IObjectWithQuality<Goods>, float> itemFlow = [];
+
+        // Count frequency and sum flows for each item
+        foreach (var link in loopLinks) {
+            var goods = link.goods;
+            itemFrequency[goods] = itemFrequency.GetValueOrDefault(goods, 0) + 1;
+            itemFlow[goods] = itemFlow.GetValueOrDefault(goods, 0) + Math.Abs(link.notMatchedFlow);
+        }
+
+        // Score items based on multiple factors:
+        // 1. Items that appear multiple times in the loop (higher frequency = more central)
+        // 2. Items with higher unmatched flow (more problematic)
+        // 3. Items that are intermediate products (not raw materials or final products)
+        var scoredItems = itemFrequency.Keys.Select(goods => {
+            float score = 0;
+
+            // Frequency score (items appearing multiple times are more central)
+            score += itemFrequency[goods] * 10;
+
+            // Flow score (higher unmatched flow = more problematic)
+            score += itemFlow[goods];
+
+            // Intermediate product bonus (items that are both produced and consumed)
+            var target = goods.target;
+            bool isProduced = target.production.Length > 0;
+            bool isConsumed = target.usages.Length > 0;
+            if (isProduced && isConsumed) {
+                score += 5; // Intermediate products are often the root cause
+            }
+
+            // Raw material penalty (less likely to be the root cause)
+            if (!isProduced && isConsumed) {
+                score -= 3;
+            }
+
+            // Final product penalty (less likely to be the root cause)
+            if (isProduced && !isConsumed) {
+                score -= 2;
+            }
+
+            return new { goods, score };
+        }).OrderByDescending(x => x.score).ToArray();
+
+        return scoredItems.Select(x => x.goods).ToArray();
     }
 
     public bool FindLink(IObjectWithQuality<Goods> goods, [MaybeNullWhen(false)] out IProductionLink link) {

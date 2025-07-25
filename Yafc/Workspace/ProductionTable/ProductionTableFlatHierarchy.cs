@@ -141,10 +141,23 @@ public class FlatHierarchy<TRow, TGroup>(DataGrid<TRow> grid, Action<ImGui, TGro
                 nextRowTextColor = SchemeColor.BackgroundText;
             }
 
-            bool isError = recipe is RecipeRow r && r.warningFlags >= WarningFlags.EntityNotSpecified;
-            if (isError) {
-                nextRowBackgroundColor = SchemeColor.Error;
-                nextRowTextColor = SchemeColor.PureForeground;
+            if (recipe is RecipeRow recipeRow && recipeRow.warningFlags >= WarningFlags.EntityNotSpecified) {
+                // Use different background colors based on error type for better visibility
+                if (recipeRow.warningFlags.HasFlag(WarningFlags.SolverInfeasible)) {
+                    // Solver infeasible - use a more subtle orange/amber background
+                    nextRowBackgroundColor = SchemeColor.Secondary;
+                    nextRowTextColor = SchemeColor.BackgroundText;
+                }
+                else if (recipeRow.warningFlags.HasFlag(WarningFlags.DeadlockCandidate) || recipeRow.warningFlags.HasFlag(WarningFlags.OverproductionRequired)) {
+                    // Deadlock/overproduction - use a muted red background
+                    nextRowBackgroundColor = SchemeColor.ErrorAlt;
+                    nextRowTextColor = SchemeColor.BackgroundText;
+                }
+                else {
+                    // Other errors - use the original bright red for critical issues
+                    nextRowBackgroundColor = SchemeColor.Error;
+                    nextRowTextColor = SchemeColor.PureForeground;
+                }
             }
 
             if (recipe != null) {
@@ -175,7 +188,7 @@ public class FlatHierarchy<TRow, TGroup>(DataGrid<TRow> grid, Action<ImGui, TGro
                         MoveFlatHierarchy(gui.GetDraggingObject<TRow>()!, recipe);
                     }
 
-                    if (nextRowIsHighlighted || isError) {
+                    if (nextRowIsHighlighted || (recipe is RecipeRow r && r.warningFlags >= WarningFlags.EntityNotSpecified)) {
                         rect.X += depWidth;
                         rect.Width -= depWidth;
                         gui.DrawRectangle(rect, nextRowBackgroundColor);

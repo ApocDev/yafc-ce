@@ -145,7 +145,7 @@ public class ProductionTableContentTests {
                                 // If this fails, something weird went wrong
                                 Assert.Equal(solverGoods, displayGoods);
                                 // This tests for a failure related to https://github.com/shpaass/yafc-ce/issues/441, but for ingredients instead
-                                Assert.Equal(solverAmount * row.recipesPerSecond, displayAmount, solverAmount * .0001);
+                                Assert.Equal((double)solverAmount * row.recipesPerSecond, (double)displayAmount, (int)((double)solverAmount * .0001));
                             }
                             catch {
                                 // XUnit wants us to use async/await instead of calling Solve().Wait()
@@ -166,14 +166,14 @@ public class ProductionTableContentTests {
                             if (solverGoods == row.fuel.FuelResult()) {
                                 // ProductsForSolver doesn't include the spent fuel (in either the real or test-specific result)
                                 // Add the spent fuel amount to the value given to the solver.
-                                solverAmount += row.parameters.fuelUsagePerSecondPerRecipe;
+                                solverAmount += (decimal)row.parameters.fuelUsagePerSecondPerRecipe;
                             }
 
                             try {
                                 // If this fails, something weird went wrong
                                 Assert.Equal(solverGoods, displayGoods);
                                 // This tests for actual failure observed in https://github.com/shpaass/yafc-ce/issues/441
-                                Assert.Equal(solverAmount * row.recipesPerSecond, displayAmount, solverAmount * .0001);
+                                Assert.Equal((double)solverAmount * row.recipesPerSecond, (double)displayAmount, (int)((double)solverAmount * .0001));
                             }
                             catch {
                                 // XUnit wants us to use async/await instead of calling Solve().Wait()
@@ -211,23 +211,23 @@ public class ProductionTableContentTests {
 
         // Ensure that the fuel consumption remains constant, except when the entity and fuel change simultaneously.
         row.fixedFuel = true;
-        ((Goods oldFuel, _), float fuelAmount, _, _) = row.FuelInformation;
+        ((Goods oldFuel, _), decimal fuelAmount, _, _) = row.FuelInformation;
         testCombinations(row, table, testFuel(row, table));
         row.fixedFuel = false;
 
         // Ensure that ingredient consumption remains constant across all possible changes.
         foreach (RecipeRowIngredient ingredient in row.Ingredients) {
-            float fixedAmount = ingredient.Amount;
+            decimal fixedAmount = ingredient.Amount;
             row.fixedIngredient = ingredient.Goods;
-            testCombinations(row, table, () => { Assert.Equal(fixedAmount, row.Ingredients.Single(i => i.Goods == ingredient.Goods).Amount, fixedAmount * .0001); assertCalls++; });
+            testCombinations(row, table, () => { Assert.Equal((double)fixedAmount, (double)row.Ingredients.Single(i => i.Goods == ingredient.Goods).Amount, (int)((double)fixedAmount * .0001)); assertCalls++; });
         }
         row.fixedIngredient = null;
 
         // Ensure that product production remains constant across all possible changes.
         foreach (RecipeRowProduct product in row.Products) {
-            float fixedAmount = product.Amount;
+            decimal fixedAmount = product.Amount;
             row.fixedProduct = product.Goods;
-            testCombinations(row, table, () => { Assert.Equal(fixedAmount, row.Products.Single(p => p.Goods == product.Goods).Amount, fixedAmount * .0001); assertCalls++; });
+            testCombinations(row, table, () => { Assert.Equal((double)fixedAmount, (double)row.Products.Single(p => p.Goods == product.Goods).Amount, (int)((double)fixedAmount * .0001)); assertCalls++; });
         }
 
         Assert.Equal(expectedAssertCalls, assertCalls);
@@ -235,7 +235,7 @@ public class ProductionTableContentTests {
         // The complicated tests for when the fixed value is expected to reset when fixed fuels are involved.
         Action testFuel(RecipeRow row, ProductionTable table) => () => {
             if (row.entity.target.energy.fuels.Contains(oldFuel)) {
-                Assert.Equal(fuelAmount, row.FuelInformation.Amount, fuelAmount * .0001);
+                Assert.Equal((double)fuelAmount, (double)row.FuelInformation.Amount, (int)((double)fuelAmount * .0001));
                 assertCalls++;
             }
             else {
