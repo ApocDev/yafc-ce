@@ -1145,6 +1145,7 @@ goodsHaveNoProduction:;
             }
             #endregion
 
+
             #region Fixed production/consumption
             if (goods != null && recipe != null && recipe.hierarchyEnabled) {
                 if (recipe.fixedBuildings == 0
@@ -1210,6 +1211,27 @@ goodsHaveNoProduction:;
                     }
                     targetGui.Rebuild();
                 }
+            }
+            #endregion
+
+            #region Percentage-based ingredient consumption
+            if (goods != null && recipe != null && recipe.hierarchyEnabled && type == ProductDropdownType.Ingredient) {
+                bool hasPercentageConstraint = recipe.ingredientConsumptionPercentages.ContainsKey(goods);
+
+                if (!hasPercentageConstraint) {
+                    // Show button to set percentage constraint
+                    if (gui.BuildButton("Set consumption %") && gui.CloseDropdown()) {
+                        recipe.RecordUndo().ingredientConsumptionPercentages[goods] = 0.5f; // Default to 50%
+                        Console.WriteLine($"DEBUG: Set percentage for {goods.target.name} in {recipe.recipe.target.name} to 50%");
+                    }
+                }
+                else {
+                    // Show button to clear percentage constraint
+                    if (gui.BuildButton("Clear consumption %") && gui.CloseDropdown()) {
+                        _ = recipe.RecordUndo().ingredientConsumptionPercentages.Remove(goods);
+                    }
+                }
+                targetGui.Rebuild();
             }
             #endregion
 
@@ -1329,13 +1351,49 @@ goodsHaveNoProduction:;
             };
         }
 
-        if (recipe != null && recipe.fixedBuildings > 0 && recipe.hierarchyEnabled
+        bool isFixedAmount = recipe != null && recipe.fixedBuildings > 0 && recipe.hierarchyEnabled
             && ((dropdownType == ProductDropdownType.Fuel && recipe.fixedFuel)
             || (dropdownType == ProductDropdownType.Ingredient && recipe.fixedIngredient == goods)
-            || (dropdownType == ProductDropdownType.Product && recipe.fixedProduct == goods))) {
+            || (dropdownType == ProductDropdownType.Product && recipe.fixedProduct == goods));
 
+        bool hasPercentageConstraint = recipe != null && recipe.hierarchyEnabled && goods != null
+            && dropdownType == ProductDropdownType.Ingredient
+            && recipe.ingredientConsumptionPercentages.ContainsKey(goods);
+
+        if (isFixedAmount) {
+            // Show editable amount for fixed amounts
             evt = gui.BuildFactorioObjectWithEditableAmount(goods, displayAmount, ButtonDisplayStyle.ProductionTableScaled(iconColor, drawTransparent), tooltipOptions: tooltipOptions,
                 setKeyboardFocus: recipe.ShouldFocusFixedCountThisTime());
+        }
+        else if (hasPercentageConstraint) {
+            // For percentage constraints, show the consumption amount with editable percentage underneath
+            evt = (GoodsWithAmountEvent)gui.BuildFactorioObjectWithAmount(goods, displayAmount, ButtonDisplayStyle.ProductionTableScaled(iconColor, drawTransparent),
+                TextBlockDisplayStyle.Centered with { Color = textColor }, tooltipOptions: tooltipOptions);
+
+            // Add percentage input field underneath, similar to fixed building count
+            if (recipe != null && goods != null) {
+                float currentPercentage = recipe.ingredientConsumptionPercentages[goods];
+                DisplayAmount percentageAmount = new DisplayAmount(currentPercentage, UnitOfMeasure.Percent);
+
+                // Show just the percentage text without the icon to avoid duplication
+                using (gui.EnterRow()) {
+                    gui.spacing = 0.25f;
+                    if (gui.BuildFloatInput(percentageAmount, TextBoxDisplayStyle.FactorioObjectInput)) {
+                        // percentageAmount.Value is already the decimal value (e.g., 0.6 for 60%)
+                        // No need to divide by 100 - DisplayAmount with UnitOfMeasure.Percent handles the conversion
+                        float newPercentage = percentageAmount.Value;
+                        if (newPercentage <= 0f || newPercentage > 1f) {
+                            // Remove percentage setting if set to 0, negative, or over 100%
+                            _ = recipe.RecordUndo().ingredientConsumptionPercentages.Remove(goods);
+                            Console.WriteLine($"DEBUG: Removed percentage constraint for {goods.target.name} in {recipe.recipe.target.name} (value was {newPercentage * 100f}%)");
+                        }
+                        else {
+                            recipe.RecordUndo().ingredientConsumptionPercentages[goods] = newPercentage;
+                            Console.WriteLine($"DEBUG: Updated percentage for {goods.target.name} in {recipe.recipe.target.name} to {newPercentage * 100f}% (stored as {newPercentage})");
+                        }
+                    }
+                }
+            }
         }
         else {
             evt = (GoodsWithAmountEvent)gui.BuildFactorioObjectWithAmount(goods, displayAmount, ButtonDisplayStyle.ProductionTableScaled(iconColor, drawTransparent),
@@ -1353,8 +1411,21 @@ goodsHaveNoProduction:;
                 RebuildIf(pLink.Destroy());
                 break;
             case GoodsWithAmountEvent.TextEditing when displayAmount.Value >= 0:
-                // The amount is always stored in fixedBuildings. Scale it to match the requested change to this item.
-                recipe!.RecordUndo().fixedBuildings *= displayAmount.Value / amount;
+                if (hasPercentageConstraint && !isFixedAmount && recipe != null && goods != null) {
+                    // Handle percentage constraint editing
+                    float newPercentage = displayAmount.Value / 100f; // Convert from percentage to decimal
+                    if (newPercentage <= 0f || newPercentage >= 1f) {
+                        // Remove percentage setting if set to 0, negative, or 100%
+                        _ = recipe.RecordUndo().ingredientConsumptionPercentages.Remove(goods);
+                    }
+                    else {
+                        recipe.RecordUndo().ingredientConsumptionPercentages[goods] = newPercentage;
+                    }
+                }
+                else if (recipe != null) {
+                    // The amount is always stored in fixedBuildings. Scale it to match the requested change to this item.
+                    recipe.RecordUndo().fixedBuildings *= displayAmount.Value / amount;
+                }
                 break;
         }
     }

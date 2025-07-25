@@ -458,6 +458,7 @@ match:
             var link = allLinks[i];
             float min = link.algorithm == LinkAlgorithm.AllowOverConsumption ? float.NegativeInfinity : link.amount;
             float max = link.algorithm == LinkAlgorithm.AllowOverProduction ? float.PositiveInfinity : link.amount;
+
             var constraint = productionTableSolver.MakeConstraint(min, max, link.goods.QualityName() + "_recipe");
             constraints[i] = constraint;
             link.solverIndex = i;
@@ -491,7 +492,10 @@ match:
             foreach (var ingredient in recipe.IngredientsForSolver) {
                 if (recipe.FindLink(ingredient.Goods, out var link)) {
                     link.flags |= ProductionLink.Flags.HasConsumption;
-                    AddLinkCoefficient(constraints[link.solverIndex], recipeVar, link, recipe, -(float)ingredient.Amount);
+                    float ingredientAmount = -(float)ingredient.Amount;
+
+
+                    AddLinkCoefficient(constraints[link.solverIndex], recipeVar, link, recipe, ingredientAmount);
                 }
 
                 links.ingredients[ingredient.LinkIndex] = link as ProductionLink;
@@ -537,6 +541,82 @@ match:
 
         for (int i = 0; i < allRecipes.Count; i++) {
             objective.SetCoefficient(vars[i], allRecipes[i].BaseCost);
+        }
+
+        // Add percentage-based ingredient consumption constraints BEFORE solving
+        // Group recipes by shared ingredients that have percentage constraints
+        var ingredientGroups = new Dictionary<IObjectWithQuality<Goods>, List<(IRecipeRow recipe, float percentage)>>();
+
+        foreach (var recipe in allRecipes) {
+            if (recipe.RecipeRow?.ingredientConsumptionPercentages != null) {
+                foreach (var (goods, percentage) in recipe.RecipeRow.ingredientConsumptionPercentages) {
+                    if (!ingredientGroups.ContainsKey(goods)) {
+                        ingredientGroups[goods] = [];
+                    }
+                    ingredientGroups[goods].Add((recipe, percentage));
+                    logger.Information("Found percentage constraint: {recipe} wants {percentage}% of {goods}",
+                        recipe.SolverName, percentage * 100, goods.target.name);
+                }
+            }
+        }
+
+        // For each ingredient that has percentage constraints, create proportional constraints
+        foreach (var (goods, recipesWithPercentages) in ingredientGroups) {
+            logger.Information("Processing ingredient {goods} with {count} recipes having percentage constraints",
+                goods.target.name, recipesWithPercentages.Count);
+
+            if (recipesWithPercentages.Count > 1) {
+                // Multiple recipes share this ingredient with percentage constraints
+                // Create proportional constraints between them
+                var firstRecipe = recipesWithPercentages[0];
+                var firstIngredient = firstRecipe.recipe.IngredientsForSolver.FirstOrDefault(i => i.Goods == goods);
+
+                if (firstIngredient != null) {
+                    float firstIngredientAmount = (float)Math.Abs(firstIngredient.Amount);
+
+                    for (int i = 1; i < recipesWithPercentages.Count; i++) {
+                        var otherRecipe = recipesWithPercentages[i];
+                        var otherIngredient = otherRecipe.recipe.IngredientsForSolver.FirstOrDefault(ing => ing.Goods == goods);
+
+                        if (otherIngredient != null) {
+                            float otherIngredientAmount = (float)Math.Abs(otherIngredient.Amount);
+
+                            // Create proportional constraint:
+                            // firstRecipe_var * firstAmount * otherPercentage = otherRecipe_var * otherAmount * firstPercentage
+                            // Rearranged: firstRecipe_var * firstAmount * otherPercentage - otherRecipe_var * otherAmount * firstPercentage = 0
+                            var proportionConstraint = productionTableSolver.MakeConstraint(0, 0,
+                                $"proportion_{goods.target.name}_{firstRecipe.recipe.GetType().Name}_{otherRecipe.recipe.GetType().Name}");
+
+                            float coeff1 = firstIngredientAmount * otherRecipe.percentage;
+                            float coeff2 = -otherIngredientAmount * firstRecipe.percentage;
+
+                            proportionConstraint.SetCoefficient(vars[allRecipes.IndexOf(firstRecipe.recipe)], coeff1);
+                            proportionConstraint.SetCoefficient(vars[allRecipes.IndexOf(otherRecipe.recipe)], coeff2);
+
+                            logger.Information("Created proportion constraint: {first}*{coeff1} + {second}*{coeff2} = 0",
+                                firstRecipe.recipe.SolverName, coeff1, otherRecipe.recipe.SolverName, coeff2);
+                        }
+                    }
+                }
+            }
+            else if (recipesWithPercentages.Count == 1) {
+                // Single recipe with percentage constraint - need to limit its consumption
+                var recipe = recipesWithPercentages[0];
+                var ingredient = recipe.recipe.IngredientsForSolver.FirstOrDefault(i => i.Goods == goods);
+
+                if (ingredient != null && recipe.recipe.FindLink(goods, out var link)) {
+                    float ingredientAmountPerRecipe = (float)Math.Abs(ingredient.Amount);
+                    float totalAvailable = Math.Abs(link.amount);
+                    float maxAllowedConsumption = totalAvailable * recipe.percentage;
+
+                    var percentageConstraint = productionTableSolver.MakeConstraint(0, maxAllowedConsumption,
+                        $"percentage_{recipe.recipe.SolverName}_{goods.target.name}");
+                    percentageConstraint.SetCoefficient(vars[allRecipes.IndexOf(recipe.recipe)], ingredientAmountPerRecipe);
+
+                    logger.Information("Created single percentage constraint: {recipe} <= {max} of {goods}",
+                        recipe.recipe.SolverName, maxAllowedConsumption, goods.target.name);
+                }
+            }
         }
 
         var result = productionTableSolver.Solve();

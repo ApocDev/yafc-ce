@@ -479,6 +479,11 @@ public class RecipeRow : ModelObject<ProductionTable>, IGroupedElement<Productio
 
     public ProductionTable? subgroup { get; set; }
     public HashSet<FactorioObject> variants { get; } = [];
+    /// <summary>
+    /// Dictionary mapping ingredient goods to their consumption percentage (0-100).
+    /// When set, this recipe will only consume the specified percentage of the available ingredient.
+    /// </summary>
+    public Dictionary<IObjectWithQuality<Goods>, float> ingredientConsumptionPercentages { get; } = [];
     [SkipSerialization] public ProductionTable linkRoot => subgroup ?? owner;
 
     public RecipeRowIngredient FuelInformation => new(fuel, (decimal)fuelUsagePerSecond, links.fuel, (fuel?.target as Fluid)?.variants?.ToArray());
@@ -860,6 +865,11 @@ public class ProductionLink(ProductionTable group, IObjectWithQuality<Goods> goo
     public IObjectWithQuality<Goods> goods { get; } = goods ?? throw new ArgumentNullException(nameof(goods), LSs.LoadErrorLinkedProductDoesNotExist);
     public float amount { get; set; }
     public LinkAlgorithm algorithm { get; set; }
+    /// <summary>
+    /// The percentage (0-100) of the total production/consumption that should be allocated to this link.
+    /// When null or 0, the link uses the default behavior (no percentage splitting).
+    /// </summary>
+    public float? splitPercentage { get; set; }
     public UnitOfMeasure flowUnitOfMeasure => goods.target.flowUnitOfMeasure;
 
     // computed variables
