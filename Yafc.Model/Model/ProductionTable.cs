@@ -600,21 +600,89 @@ match:
                 }
             }
             else if (recipesWithPercentages.Count == 1) {
-                // Single recipe with percentage constraint - need to limit its consumption
+                // Single recipe with percentage constraint - create consumption limit relative to production
                 var recipe = recipesWithPercentages[0];
                 var ingredient = recipe.recipe.IngredientsForSolver.FirstOrDefault(i => i.Goods == goods);
 
-                if (ingredient != null && recipe.recipe.FindLink(goods, out var link)) {
+                logger.Information("Processing single recipe percentage constraint: {recipe} wants {percentage}% of {goods}",
+                    recipe.recipe.SolverName, recipe.percentage * 100, goods.target.name);
+
+                if (ingredient != null) {
                     float ingredientAmountPerRecipe = (float)Math.Abs(ingredient.Amount);
-                    float totalAvailable = Math.Abs(link.amount);
-                    float maxAllowedConsumption = totalAvailable * recipe.percentage;
+                    logger.Information("Ingredient amount per recipe: {amount}", ingredientAmountPerRecipe);
 
-                    var percentageConstraint = productionTableSolver.MakeConstraint(0, maxAllowedConsumption,
-                        $"percentage_{recipe.recipe.SolverName}_{goods.target.name}");
-                    percentageConstraint.SetCoefficient(vars[allRecipes.IndexOf(recipe.recipe)], ingredientAmountPerRecipe);
+                    // Find the link for this goods and change its algorithm to allow over-production
+                    var link = allLinks.FirstOrDefault(l => l.goods == goods);
+                    if (link is ProductionLink productionLink) {
+                        // Change the link algorithm to allow over-production so surplus shows in flow
+                        productionLink.algorithm = LinkAlgorithm.AllowOverProduction;
+                        logger.Information("Set link algorithm to AllowOverProduction for {goods}", goods.target.name);
+                    }
 
-                    logger.Information("Created single percentage constraint: {recipe} <= {max} of {goods}",
-                        recipe.recipe.SolverName, maxAllowedConsumption, goods.target.name);
+                    // NEW APPROACH: Force the recipe to run by creating a minimum consumption constraint
+                    // This ensures the recipe runs at least enough to consume some of the ingredient
+
+                    int consumingRecipeIndex = allRecipes.IndexOf(recipe.recipe);
+
+                    // First, modify the link constraint to allow surplus
+                    var targetLink = allLinks.FirstOrDefault(l => l.goods == goods);
+                    if (targetLink != null) {
+                        var constraint = constraints[targetLink.solverIndex];
+                        if (constraint != null) {
+                            // Change constraint bounds to allow surplus production
+                            constraint.SetBounds(0, double.PositiveInfinity);
+                            logger.Information("Set link constraint bounds to [0, inf] for {goods}", goods.target.name);
+                        }
+                    }
+
+                    // Create a constraint that limits consumption to a percentage of total production
+                    // We'll create a constraint that relates consumption directly to production variables
+
+                    // Find all recipes that produce this goods
+                    // In YAFC, production is represented as positive amounts in ProductsForSolver, not IngredientsForSolver
+                    var producingRecipes = new List<(IRecipeRow recipe, float productionPerRecipe, int index)>();
+                    foreach (var prodRecipe in allRecipes) {
+                        var prodProduct = prodRecipe.ProductsForSolver.FirstOrDefault(p => p.Goods == goods);
+                        if (prodProduct != null && prodProduct.Amount > 0) {
+                            int prodRecipeIndex = allRecipes.IndexOf(prodRecipe);
+                            float productionPerRecipe = (float)prodProduct.Amount;
+                            producingRecipes.Add((prodRecipe, productionPerRecipe, prodRecipeIndex));
+
+                            logger.Information("Found producing recipe: {recipe} produces {amount} {goods}",
+                                prodRecipe.SolverName, productionPerRecipe, goods.target.name);
+                        }
+                    }
+
+                    if (producingRecipes.Count > 0) {
+                        // Create constraint: consumption = percentage * total_production
+                        // consumption_recipe * consumption_per_recipe = percentage * (sum of production_recipe * production_per_recipe)
+                        // Rearranged: consumption_recipe * consumption_per_recipe - percentage * (sum of production_recipe * production_per_recipe) = 0
+
+                        var percentageConstraint = productionTableSolver.MakeConstraint(0, 0,
+                            $"percentage_exact_{recipe.recipe.SolverName}_{goods.target.name}");
+
+                        // Add consumption term (positive coefficient)
+                        percentageConstraint.SetCoefficient(vars[consumingRecipeIndex], ingredientAmountPerRecipe);
+
+                        // Add production terms (negative coefficients scaled by percentage)
+                        foreach (var (prodRecipe, productionPerRecipe, prodIndex) in producingRecipes) {
+                            float prodCoeff = -productionPerRecipe * recipe.percentage;
+                            percentageConstraint.SetCoefficient(vars[prodIndex], prodCoeff);
+
+                            logger.Information("Added production term: {prodRecipe} * {coeff}",
+                                prodRecipe.SolverName, prodCoeff);
+                        }
+
+                        logger.Information("Created percentage constraint: {recipe} * {amount} <= {pct}% * total_production",
+                            recipe.recipe.SolverName, ingredientAmountPerRecipe, recipe.percentage * 100);
+                    }
+
+                    // Instead of minimum constraint, add to objective to encourage consumption
+                    // This will make the solver want to run the recipe more (negative cost = benefit)
+                    objective.SetCoefficient(vars[consumingRecipeIndex], -0.001f);
+
+                    logger.Information("Added objective incentive for {recipe} to encourage consumption",
+                        recipe.recipe.SolverName);
                 }
             }
         }
@@ -745,7 +813,18 @@ match:
 
         for (int i = 0; i < allRecipes.Count; i++) {
             var recipe = allRecipes[i];
-            recipe.recipesPerSecond = vars[i].SolutionValue();
+            double solutionValue = vars[i].SolutionValue();
+            recipe.recipesPerSecond = solutionValue;
+
+            // Debug percentage-constrained recipes
+            if (recipe.RecipeRow?.ingredientConsumptionPercentages?.Count > 0) {
+                logger.Information("POST-SOLVE: Recipe {recipe} (index {index}) solution value: {value}, recipesPerSecond: {rps}",
+                    recipe.SolverName, i, solutionValue, recipe.recipesPerSecond);
+
+                foreach (var (goods, percentage) in recipe.RecipeRow.ingredientConsumptionPercentages) {
+                    logger.Information("  - Has percentage constraint: {goods} at {pct}%", goods.target.name, percentage * 100);
+                }
+            }
         }
 
         bool builtCountExceeded = CheckBuiltCountExceeded();
