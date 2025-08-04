@@ -300,6 +300,6 @@ public class FlatHierarchy<TRow, TGroup>(DataGrid<TRow> grid, Action<ImGui, TGro
         RowHighlighting.Yellow => SchemeColor.TagColorYellowText,
         RowHighlighting.Red => SchemeColor.TagColorRedText,
         RowHighlighting.Blue => SchemeColor.TagColorBlueText,
-        _ => SchemeColor.None
+        _ => SchemeColor.BackgroundText
     };
 }

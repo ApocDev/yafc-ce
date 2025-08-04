@@ -17,6 +17,7 @@ public static class RenderingUtils {
 
     public static readonly SDL.SDL_Color Black = new SDL.SDL_Color { a = 255 };
     public static readonly SDL.SDL_Color White = new SDL.SDL_Color { r = 255, g = 255, b = 255, a = 255 };
+    public static readonly SDL.SDL_Color MutedGrey = new SDL.SDL_Color { r = 0xA0, g = 0xA0, b = 0xA0, a = 255 };
     public static readonly SDL.SDL_Color BlackTransparent = new SDL.SDL_Color { a = SEMITRANSPARENT };
     public static readonly SDL.SDL_Color WhiteTransparent = new SDL.SDL_Color { r = 255, g = 255, b = 255, a = SEMITRANSPARENT };
 
@@ -140,7 +141,7 @@ public static class RenderingUtils {
         Set(SchemeColor.Background, ColorFromHex(0x141414));        // Dark grey background
         Set(SchemeColor.BackgroundAlt, Black);                      // Black alternative
         Set(SchemeColor.BackgroundText, White);                     // White text on background
-        Set(SchemeColor.BackgroundTextFaint, WhiteTransparent);     // Faded white text
+        Set(SchemeColor.BackgroundTextFaint, White);     // Faded white text
 
         // Primary group - main accent colors (cyan/teal)
         Set(SchemeColor.Primary, ColorFromHex(0x006978));           // Dark cyan
@@ -182,25 +183,29 @@ public static class RenderingUtils {
         // Green tag
         Set(SchemeColor.TagColorGreen, ColorFromHex(0x0d261f));
         Set(SchemeColor.TagColorGreenAlt, ColorFromHex(0x050f0c));
-        Set(SchemeColor.TagColorGreenText, ColorFromHex(0x226355));
+        // Set(SchemeColor.TagColorGreenText, ColorFromHex(0x226355));
+        Set(SchemeColor.TagColorGreenText, MutedGrey);
         Set(SchemeColor.TagColorGreenTextFaint, ColorFromHex(0x0));
 
         // Yellow tag
         Set(SchemeColor.TagColorYellow, ColorFromHex(0x28260b));
         Set(SchemeColor.TagColorYellowAlt, ColorFromHex(0x191807));
-        Set(SchemeColor.TagColorYellowText, ColorFromHex(0x5b582a));
+        // Set(SchemeColor.TagColorYellowText, ColorFromHex(0x5b582a));
+        Set(SchemeColor.TagColorYellowText, MutedGrey);
         Set(SchemeColor.TagColorYellowTextFaint, ColorFromHex(0x0));
 
         // Red tag
         Set(SchemeColor.TagColorRed, ColorFromHex(0x270c0c));
         Set(SchemeColor.TagColorRedAlt, ColorFromHex(0x190808));
-        Set(SchemeColor.TagColorRedText, ColorFromHex(0x922626));
+        // Set(SchemeColor.TagColorRedText, ColorFromHex(0x922626));
+        Set(SchemeColor.TagColorRedText, MutedGrey);
         Set(SchemeColor.TagColorRedTextFaint, ColorFromHex(0x0));
 
         // Blue tag
         Set(SchemeColor.TagColorBlue, ColorFromHex(0x0c0c27));
         Set(SchemeColor.TagColorBlueAlt, ColorFromHex(0x080819));
-        Set(SchemeColor.TagColorBlueText, ColorFromHex(0x2626ab));
+        // Set(SchemeColor.TagColorBlueText, ColorFromHex(0x2626ab));
+        Set(SchemeColor.TagColorBlueText, MutedGrey);
         Set(SchemeColor.TagColorBlueTextFaint, ColorFromHex(0x0));
 
         return colors;

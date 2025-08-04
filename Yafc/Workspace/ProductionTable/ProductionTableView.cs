@@ -14,7 +14,7 @@ public class ProductionTableView : ProjectPageView<ProductionTable> {
     private readonly FlatHierarchy<RecipeRow, ProductionTable> flatHierarchyBuilder;
 
     public ProductionTableView() {
-        DataGrid<RecipeRow> grid = new DataGrid<RecipeRow>(new RecipePadColumn(this), new RecipeColumn(this), new EntityColumn(this),
+        DataGrid<RecipeRow> grid = new DataGrid<RecipeRow>(new RecipePadColumn(this), new CompletionColumn(this), new RecipeColumn(this), new EntityColumn(this),
             new IngredientsColumn(this), new ProductsColumn(this), new ModulesColumn(this));
 
         flatHierarchyBuilder = new FlatHierarchy<RecipeRow, ProductionTable>(grid, BuildSummary,
@@ -119,6 +119,18 @@ public class ProductionTableView : ProjectPageView<ProductionTable> {
 
             if (gui.BuildButton(gui.lastRect, SchemeColor.None, SchemeColor.BackgroundAlt)) {
                 gui.ShowDropDown(imGui => DrawRecipeTagSelect(imGui, row));
+            }
+        }
+    }
+
+    private class CompletionColumn(ProductionTableView view) : ProductionTableDataColumn(view, "✓", 2.5f, 2.5f, 2.5f, hasMenu: false) {
+        public override void BuildElement(ImGui gui, RecipeRow row) {
+            bool isCompleted = row.tag == 1; // Tag 1 is the green checkmark (completed state)
+
+            // Build a checkbox that toggles between tag 0 (incomplete) and tag 1 (complete)
+            // Use RectAllocator.Center to center the checkbox vertically
+            if (gui.BuildCheckBox("", isCompleted, out bool newCompleted, allocator: RectAllocator.Center)) {
+                row.RecordUndo().tag = newCompleted ? 1 : 0;
             }
         }
     }
