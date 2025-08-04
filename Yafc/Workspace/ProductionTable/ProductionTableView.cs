@@ -52,14 +52,20 @@ public class ProductionTableView : ProjectPageView<ProductionTable> {
                 ButtonEvent evt;
 
                 if (isError) {
-                    evt = gui.BuildRedButton(Icon.Error, invertedColors: true);
+                    // Add a semi-transparent background with border for better contrast with icons
+                    using (gui.EnterGroup(ImGuiUtils.DefaultIconPadding)) {
+                        gui.DrawRectangle(gui.lastRect, SchemeColor.PureBackground, RectangleBorder.Thin, drawTransparent: true);
+                        gui.BuildIcon(Icon.Error, color: SchemeColor.Error);
+                    }
+                    evt = gui.BuildButton(gui.lastRect, SchemeColor.None, SchemeColor.Error);
                 }
                 else {
+                    // Add a semi-transparent background with border for warning indicators
                     using (gui.EnterGroup(ImGuiUtils.DefaultIconPadding)) {
-                        gui.BuildIcon(Icon.Help);
+                        gui.DrawRectangle(gui.lastRect, SchemeColor.PureBackground, RectangleBorder.Thin, drawTransparent: true);
+                        gui.BuildIcon(Icon.Help, color: SchemeColor.Secondary);
                     }
-
-                    evt = gui.BuildButton(gui.lastRect, SchemeColor.None, SchemeColor.Grey);
+                    evt = gui.BuildButton(gui.lastRect, SchemeColor.None, SchemeColor.Secondary);
                 }
 
                 if (evt == ButtonEvent.MouseOver) {
