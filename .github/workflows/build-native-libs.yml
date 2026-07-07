@@ -151,16 +151,19 @@ jobs:
 
       - name: Place libraries
         run: |
-          cp artifacts/macos/osx-arm64/* Yafc/lib/osx-arm64/ 2>/dev/null || cp artifacts/macos/libSDL2*.dylib Yafc/lib/osx-arm64/ || true
-          # download-artifact flattens per the upload paths; copy defensively.
-          find artifacts/macos -name 'libSDL2*.dylib' -path '*osx-arm64*' -exec cp {} Yafc/lib/osx-arm64/ \; || true
-          find artifacts/macos -name 'libSDL2*.dylib' -path '*osx/*' -exec cp {} Yafc/lib/osx/ \; || true
-          find artifacts/windows -name 'SDL2*.dll' -exec cp {} Yafc/lib/windows/ \; || true
+          # download-artifact keeps the layout the build jobs uploaded:
+          #   artifacts/macos/osx-arm64/*, artifacts/macos/osx/*, artifacts/windows/*
+          cp artifacts/macos/osx-arm64/* Yafc/lib/osx-arm64/
+          cp artifacts/macos/osx/*       Yafc/lib/osx/
+          cp artifacts/windows/*         Yafc/lib/windows/
           git status --short
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
         with:
+          # Target the branch the workflow was dispatched from, so the PR diff is
+          # just the rebuilt libraries rather than everything since master.
+          base: ${{ github.ref_name }}
           branch: rebuild/native-libs
           title: 'Rebuild SDL2 native libraries from source'
           commit-message: 'Rebuild SDL2 native libraries from source'
