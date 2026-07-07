@@ -196,9 +196,12 @@ for key in SDL2 SDL2_image SDL2_ttf; do
   file="$STAGE/$name"
   install_name_tool -id "@loader_path/$name" "$file"
   # Rewrite any dependency that isn't an OS path to its bundled @loader_path name.
+  # Note @rpath is NOT skipped: SDL's CMake build references its own libraries as
+  # @rpath/libSDL2-2.0.0.dylib, which would not resolve in our bundle (we ship
+  # libSDL2.dylib with an @loader_path id and no rpath). Rewrite those too.
   while IFS= read -r dep; do
     case "$dep" in
-      /usr/lib/*|/System/*|@*) continue ;;
+      /usr/lib/*|/System/*|@loader_path/*) continue ;;
     esac
     base="$(basename "$dep")"
     newname=""

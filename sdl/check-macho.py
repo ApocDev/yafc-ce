@@ -51,11 +51,15 @@ CPU_NAMES = {0x01000007: "x86_64", 0x0100000C: "arm64"}
 
 # Prefixes that are guaranteed present on any macOS install, or are relative to
 # the bundle and therefore travel with Yafc.
+#
+# @rpath is intentionally NOT allowed: it only resolves if the loading image
+# carries a matching LC_RPATH, so an @rpath dependency in a bundled library is a
+# latent "works on my machine" failure. Yafc's libraries sit next to the
+# executable and must reference each other via @loader_path.
 ALLOWED_PREFIXES = (
     "/usr/lib/",
     "/System/Library/",
     "@loader_path/",
-    "@rpath/",
     "@executable_path/",
 )
 
