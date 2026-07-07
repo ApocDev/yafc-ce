@@ -92,30 +92,30 @@ fetch() { # url sha256 outfile
 # Static-link the MinGW runtime so the DLLs are self-contained.
 STATIC_RT_FLAGS="-static -static-libgcc -static-libstdc++"
 
-# Common cross-compile CMake args.
-common_cmake_args() {
-  echo \
-    "-G" "Ninja" \
-    "-DCMAKE_BUILD_TYPE=Release" \
-    "-DCMAKE_SYSTEM_NAME=Windows" \
-    "-DCMAKE_C_COMPILER=${HOST}-gcc" \
-    "-DCMAKE_CXX_COMPILER=${HOST}-g++" \
-    "-DCMAKE_RC_COMPILER=${HOST}-windres" \
-    "-DCMAKE_FIND_ROOT_PATH=/usr/${HOST};$PREFIX" \
-    "-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER" \
-    "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH" \
-    "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH" \
-    "-DCMAKE_INSTALL_PREFIX=$PREFIX" \
-    "-DCMAKE_PREFIX_PATH=$PREFIX" \
-    "-DBUILD_SHARED_LIBS=ON" \
-    "-DCMAKE_SHARED_LINKER_FLAGS=$STATIC_RT_FLAGS" \
-    "-DCMAKE_EXE_LINKER_FLAGS=$STATIC_RT_FLAGS"
-}
+# Common cross-compile CMake args. An array (not an echo'd string) so the
+# space-containing linker-flag values stay a single argument each.
+COMMON_CMAKE_ARGS=(
+  -G Ninja
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_SYSTEM_NAME=Windows
+  "-DCMAKE_C_COMPILER=${HOST}-gcc"
+  "-DCMAKE_CXX_COMPILER=${HOST}-g++"
+  "-DCMAKE_RC_COMPILER=${HOST}-windres"
+  "-DCMAKE_FIND_ROOT_PATH=/usr/${HOST};$PREFIX"
+  -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
+  -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH
+  -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH
+  "-DCMAKE_INSTALL_PREFIX=$PREFIX"
+  "-DCMAKE_PREFIX_PATH=$PREFIX"
+  -DBUILD_SHARED_LIBS=ON
+  "-DCMAKE_SHARED_LINKER_FLAGS=$STATIC_RT_FLAGS"
+  "-DCMAKE_EXE_LINKER_FLAGS=$STATIC_RT_FLAGS"
+)
 
 build_cmake() { # srcDir buildDir extra-args...
   local src="$1" bld="$2"; shift 2
-  cmake -S "$src" -B "$bld" $(common_cmake_args) "$@"
-  cmake --build "$bld"
+  cmake -S "$src" -B "$bld" "${COMMON_CMAKE_ARGS[@]}" "$@"
+  cmake --build "$bld" ${CMAKE_BUILD_VERBOSE:+--verbose}
   cmake --install "$bld"
 }
 

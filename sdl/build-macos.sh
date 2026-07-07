@@ -53,11 +53,16 @@ ARM64_DIR="$REPO_ROOT/Yafc/lib/osx-arm64"
 INTEL_DIR="$REPO_ROOT/Yafc/lib/osx"
 
 # Final filenames Yafc loads (see Yafc/YafcLib.cs GetOsxMappedLibraryName).
-declare -A OUTPUT=(
-  [SDL2]="libSDL2.dylib"
-  [SDL2_image]="libSDL2_image.dylib"
-  [SDL2_ttf]="libSDL2_ttf.dylib"
-)
+# A function rather than an associative array: macOS ships bash 3.2, which has
+# no `declare -A`.
+output_name() {
+  case "$1" in
+    SDL2)       echo "libSDL2.dylib" ;;
+    SDL2_image) echo "libSDL2_image.dylib" ;;
+    SDL2_ttf)   echo "libSDL2_ttf.dylib" ;;
+    *) echo "unknown key: $1" >&2; return 1 ;;
+  esac
+}
 
 # Heavy logging: while we are still validating this pipeline (issue #659) we want
 # to see exactly what each stage produced. Set SDL_BUILD_QUIET=1 to trim it down.
@@ -176,15 +181,17 @@ cmake --install "$WORK/build-SDL2_ttf"
 # the executable regardless of where Yafc is installed.
 log "Staging freshly built dylibs"
 for key in SDL2 SDL2_image SDL2_ttf; do
-  src="$(readlink -f "$PREFIX/lib/${OUTPUT[$key]}")"
-  cp "$src" "$STAGE/${OUTPUT[$key]}"
-  dump_macho "as-built $key" "$STAGE/${OUTPUT[$key]}"
+  name="$(output_name "$key")"
+  # cp dereferences the unversioned symlink and copies the real dylib content.
+  cp "$PREFIX/lib/$name" "$STAGE/$name"
+  dump_macho "as-built $key" "$STAGE/$name"
 done
 
 log "Rewriting install names to @loader_path"
 for key in SDL2 SDL2_image SDL2_ttf; do
-  file="$STAGE/${OUTPUT[$key]}"
-  install_name_tool -id "@loader_path/${OUTPUT[$key]}" "$file"
+  name="$(output_name "$key")"
+  file="$STAGE/$name"
+  install_name_tool -id "@loader_path/$name" "$file"
   # Rewrite any dependency that isn't an OS path to its bundled @loader_path name.
   while IFS= read -r dep; do
     case "$dep" in
@@ -193,9 +200,9 @@ for key in SDL2 SDL2_image SDL2_ttf; do
     base="$(basename "$dep")"
     newname=""
     case "$base" in
-      libSDL2-*.dylib|libSDL2.dylib)             newname="${OUTPUT[SDL2]}" ;;
-      libSDL2_image-*.dylib|libSDL2_image.dylib) newname="${OUTPUT[SDL2_image]}" ;;
-      libSDL2_ttf-*.dylib|libSDL2_ttf.dylib)     newname="${OUTPUT[SDL2_ttf]}" ;;
+      libSDL2-*.dylib|libSDL2.dylib)             newname="$(output_name SDL2)" ;;
+      libSDL2_image-*.dylib|libSDL2_image.dylib) newname="$(output_name SDL2_image)" ;;
+      libSDL2_ttf-*.dylib|libSDL2_ttf.dylib)     newname="$(output_name SDL2_ttf)" ;;
       *)
         echo "Unexpected external dependency in $file: $dep" >&2
         echo "The build is supposed to be self-contained; refusing to continue." >&2
@@ -211,8 +218,9 @@ done
 # Apple Silicon will load it.
 log "Re-signing (ad-hoc)"
 for key in SDL2 SDL2_image SDL2_ttf; do
-  codesign --force --sign - "$STAGE/${OUTPUT[$key]}"
-  dump_macho "relinked+signed $key" "$STAGE/${OUTPUT[$key]}"
+  name="$(output_name "$key")"
+  codesign --force --sign - "$STAGE/$name"
+  dump_macho "relinked+signed $key" "$STAGE/$name"
 done
 
 # ---- Verify before copying anything into the repo ----------------------------
@@ -224,7 +232,7 @@ copy_arch() { # lipo-arch  dest-dir
   local arch="$1" dest="$2"
   mkdir -p "$dest"
   for key in SDL2 SDL2_image SDL2_ttf; do
-    local name="${OUTPUT[$key]}"
+    local name; name="$(output_name "$key")"
     if lipo "$STAGE/$name" -verify_arch "$arch" 2>/dev/null; then
       lipo "$STAGE/$name" -thin "$arch" -output "$dest/$name"
     else
