@@ -97,6 +97,9 @@ STATIC_RT_FLAGS="-static -static-libgcc -static-libstdc++"
 COMMON_CMAKE_ARGS=(
   -G Ninja
   -DCMAKE_BUILD_TYPE=Release
+  # Vendored FreeType still declares cmake_minimum_required < 3.5, which CMake 4
+  # rejects; this restores the old policy floor.
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5
   -DCMAKE_SYSTEM_NAME=Windows
   "-DCMAKE_C_COMPILER=${HOST}-gcc"
   "-DCMAKE_CXX_COMPILER=${HOST}-g++"
