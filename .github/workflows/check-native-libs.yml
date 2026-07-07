@@ -1,0 +1,31 @@
+# Guard against committing macOS dylibs that are not self-contained.
+#
+# The bundled SDL dylibs must depend only on macOS system libraries and on each
+# other via @loader_path. A library copied straight from Homebrew bakes absolute
+# /opt/homebrew/... paths into its load commands and fails to launch on any Mac
+# without Homebrew (issue #659). This check parses the committed dylibs and fails
+# the PR if any of them references such a path, so a bad binary can never land
+# again -- no matter how it was produced.
+
+name: Check native libraries
+
+on:
+  pull_request:
+    paths:
+      - 'Yafc/lib/**'
+      - 'sdl/**'
+      - '.github/workflows/check-native-libs.yml'
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'Yafc/lib/**'
+      - 'sdl/**'
+
+jobs:
+  check-macos-dylibs:
+    name: macOS dylibs are self-contained
+    runs-on: ubuntu-latest  # the checker parses Mach-O directly; no macOS needed
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify install names
+        run: python3 sdl/check-macho.py Yafc/lib/osx-arm64 Yafc/lib/osx

@@ -1,0 +1,177 @@
+# Rebuild the bundled SDL2 native libraries from pinned upstream source.
+#
+# This is a manually-triggered ("workflow_dispatch") job -- SDL rarely changes,
+# so it runs only when someone deliberately bumps a version. It exists so the
+# committed libraries have real provenance (built from tagged source with a known
+# configuration) instead of anonymous binaries copied out of someone's Homebrew
+# folder, which is what caused issue #659.
+#
+#   * macOS  -> built on a macOS runner (needs install_name_tool/lipo/codesign),
+#               universal arm64+x86_64, split into Yafc/lib/osx-arm64 and osx.
+#   * Windows -> cross-compiled on Linux with MinGW-w64 into Yafc/lib/windows.
+#   * Linux   -> not built: Linux users get SDL from their distro's packages.
+#
+# By default the job only builds, verifies and uploads the results as artifacts
+# so they can be inspected. Set "open_pr" to true to also open a pull request
+# with the rebuilt libraries.
+
+name: Build native libraries
+
+on:
+  # TEMPORARY (validation on the fork): auto-run on pushes to the work branch so
+  # we can iterate on the build and read the logs. Remove before the upstream PR.
+  push:
+    branches: [ 'fix/macos-sdl-homebrew-659' ]
+  workflow_dispatch:
+    inputs:
+      sdl2_version:
+        description: SDL2 version
+        default: '2.32.10'
+      sdl2_image_version:
+        description: SDL2_image version
+        default: '2.8.12'
+      sdl2_ttf_version:
+        description: SDL2_ttf version
+        default: '2.24.0'
+      sdl2_sha256:
+        description: SDL2 tarball sha256 (blank = script default)
+        default: ''
+      sdl2_image_sha256:
+        description: SDL2_image tarball sha256 (blank = script default)
+        default: ''
+      sdl2_ttf_sha256:
+        description: SDL2_ttf tarball sha256 (blank = script default)
+        default: ''
+      verbose:
+        description: Verbose compiler output
+        type: boolean
+        default: true
+      open_pr:
+        description: Open a pull request with the rebuilt libraries
+        type: boolean
+        default: false
+
+# Version/checksum inputs are shared by every job. Blank checksum inputs fall
+# through to the defaults baked into the build scripts.
+env:
+  SDL2_VERSION: ${{ inputs.sdl2_version }}
+  SDL2_IMAGE_VERSION: ${{ inputs.sdl2_image_version }}
+  SDL2_TTF_VERSION: ${{ inputs.sdl2_ttf_version }}
+  SDL2_SHA256: ${{ inputs.sdl2_sha256 }}
+  SDL2_IMAGE_SHA256: ${{ inputs.sdl2_image_sha256 }}
+  SDL2_TTF_SHA256: ${{ inputs.sdl2_ttf_sha256 }}
+  CMAKE_BUILD_VERBOSE: ${{ inputs.verbose && '1' || '' }}
+
+jobs:
+  macos:
+    name: macOS (universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install cmake ninja
+
+      - name: Tool versions
+        run: |
+          cmake --version
+          ninja --version
+          clang --version
+          sw_vers
+
+      - name: Build SDL2 dylibs
+        run: bash sdl/build-macos.sh
+
+      - name: Show result
+        run: |
+          echo "=== git status ==="; git status --short
+          echo "=== git diff --stat ==="; git diff --stat
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dylibs
+          path: |
+            Yafc/lib/osx-arm64/libSDL2*.dylib
+            Yafc/lib/osx/libSDL2*.dylib
+          if-no-files-found: error
+
+  windows:
+    name: Windows (MinGW cross-compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 cmake ninja-build
+
+      - name: Tool versions
+        run: |
+          cmake --version
+          ninja --version
+          x86_64-w64-mingw32-gcc --version
+
+      - name: Build SDL2 DLLs
+        run: bash sdl/build-windows.sh
+
+      - name: Show result
+        run: |
+          echo "=== git status ==="; git status --short
+          echo "=== git diff --stat ==="; git diff --stat
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-dlls
+          path: Yafc/lib/windows/SDL2*.dll
+          if-no-files-found: error
+
+  open-pr:
+    name: Open pull request
+    needs: [macos, windows]
+    if: ${{ inputs.open_pr }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS dylibs
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dylibs
+          path: artifacts/macos
+
+      - name: Download Windows DLLs
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-dlls
+          path: artifacts/windows
+
+      - name: Place libraries
+        run: |
+          cp artifacts/macos/osx-arm64/* Yafc/lib/osx-arm64/ 2>/dev/null || cp artifacts/macos/libSDL2*.dylib Yafc/lib/osx-arm64/ || true
+          # download-artifact flattens per the upload paths; copy defensively.
+          find artifacts/macos -name 'libSDL2*.dylib' -path '*osx-arm64*' -exec cp {} Yafc/lib/osx-arm64/ \; || true
+          find artifacts/macos -name 'libSDL2*.dylib' -path '*osx/*' -exec cp {} Yafc/lib/osx/ \; || true
+          find artifacts/windows -name 'SDL2*.dll' -exec cp {} Yafc/lib/windows/ \; || true
+          git status --short
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: rebuild/native-libs
+          title: 'Rebuild SDL2 native libraries from source'
+          commit-message: 'Rebuild SDL2 native libraries from source'
+          body: |
+            Rebuilt the bundled SDL2 libraries from pinned upstream source via the
+            `Build native libraries` workflow.
+
+            * SDL2 `${{ inputs.sdl2_version }}`
+            * SDL2_image `${{ inputs.sdl2_image_version }}` (stb backend, no external codecs)
+            * SDL2_ttf `${{ inputs.sdl2_ttf_version }}` (vendored FreeType + HarfBuzz)
+
+            macOS dylibs are relinked to `@loader_path` so they no longer require
+            Homebrew (fixes #659). Windows DLLs are MinGW cross-compiled with a
+            static runtime.
