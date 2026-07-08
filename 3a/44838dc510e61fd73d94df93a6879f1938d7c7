@@ -1,0 +1,25 @@
+sdl/README.md
+  s_46d6f204414c9c::t_80bfbb9240d85e 3,5,9,15-16,18,22,28,34,38,44,46,50-53,57,59-60,66
+sdl/build-windows.sh
+  s_46d6f204414c9c::t_bf6f51011e5442 53-68,74-80,85-89,122-132,136-137,142
+sdl/update-versions.sh
+  s_46d6f204414c9c::t_d3d1693fc59808 26,34
+sdl/build-macos.sh
+  s_46d6f204414c9c::t_24a7c595ec693b 48-53,60-73,78-80,88-89,119-122,127-150,157-159,168-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3a44838dc510e61fd73d94df93a6879f1938d7c7",
+  "prompts": {},
+  "sessions": {
+    "s_46d6f204414c9c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e9d27a16-23e4-4724-9f56-cf7095a390e0",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "ApocDev <apocdev@gmail.com>"
+    }
+  }
+}
